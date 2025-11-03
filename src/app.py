@@ -141,21 +141,19 @@ def toggle_view_mode(view_mode):
         Tuple of visibility updates for rows and button active states
     """
     if view_mode == "Classic":
-        # Show full layout and simple layout rows, hide split layout
+        # Show full layout, hide split layout
         # Classic button active, Split button inactive
         return (
             gr.update(visible=True),   # full_layout_row
-            gr.update(visible=False),  # simple_layout_row (keep hidden)
             gr.update(visible=False),  # split_layout_row
             gr.update(elem_classes=["theme-btn", "theme-btn-active"]),  # classic_btn (active)
             gr.update(elem_classes=["theme-btn"]),  # split_btn (inactive)
         )
     else:  # view_mode == "Split"
-        # Hide full and simple layouts, show split layout
+        # Hide full layout, show split layout
         # Split button active, Classic button inactive
         return (
             gr.update(visible=False),  # full_layout_row
-            gr.update(visible=False),  # simple_layout_row
             gr.update(visible=True),   # split_layout_row
             gr.update(elem_classes=["theme-btn"]),  # classic_btn (inactive)
             gr.update(elem_classes=["theme-btn", "theme-btn-active"]),  # split_btn (active)
@@ -232,6 +230,20 @@ def build_interface():
         .gr-panel {background: #1a1a1a !important;}
         .tabitem {background: #1a1a1a !important;}
         .tabs > .tab-nav {background: #0a0a0a !important;}
+        
+        /* Copy feedback button styling */
+        .copy-feedback-btn {
+            background: #2563eb !important;
+            color: white !important;
+            border: 1px solid #1e40af !important;
+            padding: 4px 8px !important;
+            margin-left: auto !important;
+            min-width: 80px !important;
+        }
+        .copy-feedback-btn:hover {
+            background: #1d4ed8 !important;
+            border-color: #1e3a8a !important;
+        }
         .tab-nav button {
             color: #f0f0f0 !important;
             background: #2a2a2a !important;
@@ -548,11 +560,11 @@ def build_interface():
                         
                         with gr.Row():
                             with gr.Column():
-                                gr.Markdown("**📝 Text Submission**")
-                                submission_text = gr.Textbox(label="Text", placeholder="Paste work...", lines=16, max_lines=16)
-                            with gr.Column():
                                 gr.Markdown("**📁 File Submission**")
                                 file_upload = gr.File(label="File", file_types=[".pdf", ".docx", ".doc", ".txt", ".jpg", ".png"])
+                            with gr.Column():
+                                gr.Markdown("**📝 Text Submission**")
+                                submission_text = gr.Textbox(label="Text", placeholder="Paste work...", lines=16, max_lines=16)
                     
                     with gr.Tab("📊 Output", id=1):
                         # Submission Preview (shown immediately on grade start)
@@ -574,7 +586,9 @@ def build_interface():
                                 # Row 1: Grade + AI Detection side by side
                                 with gr.Row():
                                     with gr.Column(scale=1):
-                                        gr.Markdown("**Extracted Grade**")
+                                        with gr.Row():
+                                            gr.Markdown("**Extracted Grade**")
+                                            copy_grade_btn = gr.Button("📋 Copy", size="sm", elem_classes="copy-feedback-btn")
                                         grade_result = gr.Textbox(label="Grade", interactive=False, max_lines=2)
                                     with gr.Column(scale=1):
                                         gr.Markdown("**🔍 Keyword Detection**")
@@ -601,9 +615,10 @@ def build_interface():
                                         gr.Markdown("**Grading Reason (for Instructor)**")
                                         grading_reason = gr.Textbox(label="Detailed Feedback", lines=6, max_lines=6, interactive=False)
                                     with gr.Column(scale=1):
-                                        gr.Markdown("**Student Feedback**")
+                                        with gr.Row():
+                                            gr.Markdown("**Student Feedback**")
+                                            copy_student_feedback_btn = gr.Button("📋 Copy", size="sm", elem_classes="copy-feedback-btn")
                                         student_feedback_output = gr.Textbox(label="Feedback for Student", lines=6, max_lines=6, interactive=False)
-                                        copy_student_feedback_btn = gr.Button("📋 Copy Student Feedback", size="sm", variant="secondary")
                                 
                                 # Context Usage - more compact
                                 gr.Markdown("---")
@@ -679,124 +694,6 @@ def build_interface():
                             )
                             update_fewshot_btn = gr.Button("Update Few-Shot Status", size="sm", variant="primary")
         
-        # SIMPLE LAYOUT - Two Column Layout
-        with gr.Row(visible=False) as simple_layout_row:
-            # LEFT: Input Panel
-            with gr.Column(scale=1):
-                gr.Markdown("### 📝 Quick Grade")
-                
-                # Grade button at top
-                simple_grade_btn = gr.Button("🎓 Grade", variant="primary", size="lg")
-                simple_clear_btn = gr.Button("🗑️ Clear All", variant="secondary", size="sm")
-                
-                gr.Markdown("---")
-                
-                # Text submission
-                gr.Markdown("**📝 Text Submission**")
-                simple_submission_text = gr.Textbox(label="Text", placeholder="Paste work...", lines=20, max_lines=20)
-                
-                # File upload
-                gr.Markdown("**📁 File Submission**")
-                simple_file_upload = gr.File(label="File", file_types=[".pdf", ".docx", ".doc", ".txt", ".jpg", ".png"])
-                
-                gr.Markdown("---")
-                
-                # Minimal grading setup (collapsed accordion)
-                with gr.Accordion("⚙️ Grading Settings", open=False):
-                    simple_instruction = gr.Textbox(label="Instructions", placeholder="Task...", lines=3, max_lines=3)
-                    simple_criteria = gr.Textbox(label="Rubric", placeholder="Criteria...", lines=4, max_lines=4)
-                    
-                    with gr.Row():
-                        simple_output_format = gr.Dropdown(
-                            choices=["letter", "numeric", "pass/fail"],
-                            value="letter",
-                            label="Output Format", 
-                            scale=2
-                        )
-                        simple_max_score = gr.Number(value=100, label="Max", precision=0, scale=1)
-                    
-                    simple_model_dropdown = gr.Dropdown(
-                        choices=get_installed_models(),
-                        value=get_installed_models()[0] if get_installed_models() else None,
-                        label="Model"
-                    )
-                    simple_temperature = gr.Slider(0.0, 1.0, value=0.3, step=0.1, label="Temp")
-                    
-                    simple_ai_keywords = gr.Textbox(
-                        label="AI Detection Keywords (optional)",
-                        placeholder="e.g., ChatGPT, as an AI language model",
-                        lines=2,
-                        max_lines=2
-                    )
-                    
-                    simple_additional_requirements = gr.Textbox(
-                        label="Additional Requirements (optional)",
-                        placeholder="Extra grading requirements...",
-                        lines=2,
-                        max_lines=2
-                    )
-                    
-                    simple_use_few_shot = gr.Checkbox(label="Enable few-shot learning", value=True)
-                    simple_num_examples = gr.Slider(minimum=0, maximum=5, value=2, step=1, label="Number of examples")
-                    simple_use_llm_parse = gr.Checkbox(label="Use LLM Parse if JSON fails", value=False)
-            
-            # RIGHT: Output Panel
-            with gr.Column(scale=1):
-                gr.Markdown("### 📊 Grading Results")
-                
-                # Submission Preview
-                with gr.Accordion("📄 Submission Preview", open=True):
-                    simple_submission_preview = gr.Textbox(
-                        label="Document Preview",
-                        lines=6,
-                        max_lines=6,
-                        interactive=False,
-                        placeholder="Preview will appear here when grading starts..."
-                    )
-                
-                # Grade result (prominent)
-                gr.Markdown("**Extracted Grade**")
-                simple_grade_result = gr.Textbox(label="Grade", interactive=False, max_lines=2, scale=2)
-                
-                # AI Detection
-                with gr.Row():
-                    gr.Markdown("**🔍 Keyword Detection**")
-                    simple_ai_keyword_result = gr.Textbox(
-                        label="Exact Match (Regex)",
-                        interactive=False,
-                        max_lines=2,
-                        value="Not checked yet"
-                    )
-                
-                gr.Markdown("**📋 AI Disclosure**")
-                simple_ai_disclosure_result = gr.Textbox(
-                    label="Academic Integrity Check",
-                    interactive=False,
-                    max_lines=4,
-                    value="Not checked yet"
-                )
-                
-                # Grading Reason
-                gr.Markdown("**Grading Reason (for Instructor)**")
-                simple_grading_reason = gr.Textbox(label="Detailed Feedback", lines=8, max_lines=8, interactive=False)
-                
-                # Student Feedback
-                gr.Markdown("**Student Feedback**")
-                simple_student_feedback = gr.Textbox(label="Feedback for Student", lines=8, max_lines=8, interactive=False)
-                
-                # Context Usage
-                gr.Markdown("---")
-                simple_context_bar = gr.Slider(minimum=0, maximum=100, value=0, label="Context Usage (%)", interactive=False)
-                simple_context_details = gr.Markdown("Not calculated")
-                
-                # Debug accordions
-                with gr.Accordion("🔍 Debug: Raw LLM Output", open=False):
-                    simple_raw_llm_output = gr.Textbox(label="Raw LLM Response", lines=12, max_lines=12, interactive=False)
-                
-                with gr.Accordion("🔍 Debug: Prompt Sent to LLM", open=False):
-                    simple_system_prompt = gr.Textbox(label="System Prompt", lines=10, max_lines=10, interactive=False)
-                    simple_user_prompt = gr.Textbox(label="User Prompt", lines=10, max_lines=10, interactive=False)
-        
         # SPLIT VIEW LAYOUT - Input on Left, Output on Right
         with gr.Row(visible=False) as split_layout_row:
             # LEFT COLUMN: Input Panel
@@ -809,6 +706,13 @@ def build_interface():
                 
                 gr.Markdown("---")
                 
+                # File upload
+                gr.Markdown("**📁 File Submission**")
+                split_file_upload = gr.File(
+                    label="File", 
+                    file_types=[".pdf", ".docx", ".doc", ".txt", ".jpg", ".png"]
+                )
+                
                 # Text submission
                 gr.Markdown("**📝 Text Submission**")
                 split_submission_text = gr.Textbox(
@@ -816,13 +720,6 @@ def build_interface():
                     placeholder="Paste student work here...", 
                     lines=25, 
                     max_lines=25
-                )
-                
-                # File upload
-                gr.Markdown("**📁 File Submission**")
-                split_file_upload = gr.File(
-                    label="File", 
-                    file_types=[".pdf", ".docx", ".doc", ".txt", ".jpg", ".png"]
                 )
             
             # RIGHT COLUMN: Output Panel (ALL outputs except submission preview)
@@ -832,7 +729,9 @@ def build_interface():
                 # Main grading results
                 with gr.Row():
                     with gr.Column(scale=1):
-                        gr.Markdown("**Extracted Grade**")
+                        with gr.Row():
+                            gr.Markdown("**Extracted Grade**")
+                            copy_split_grade_btn = gr.Button("📋 Copy", size="sm", elem_classes="copy-feedback-btn")
                         split_grade_result = gr.Textbox(label="Grade", interactive=False, max_lines=2)
                     with gr.Column(scale=1):
                         gr.Markdown("**🔍 Keyword Detection**")
@@ -855,7 +754,9 @@ def build_interface():
                 )
                 
                 # Student Feedback
-                gr.Markdown("**💬 Student Feedback**")
+                with gr.Row():
+                    gr.Markdown("**💬 Student Feedback**")
+                    copy_split_student_feedback_btn = gr.Button("📋 Copy", size="sm", elem_classes="copy-feedback-btn")
                 split_student_feedback = gr.Textbox(
                     label="Student Feedback",
                     lines=6,
@@ -863,7 +764,6 @@ def build_interface():
                     interactive=False,
                     placeholder="Student-facing feedback will appear here..."
                 )
-                copy_split_student_feedback_btn = gr.Button("📋 Copy Student Feedback", size="sm", variant="secondary")
                 
                 # Strengths and Weaknesses
                 with gr.Row():
@@ -951,51 +851,14 @@ def build_interface():
         classic_btn.click(
             fn=lambda: toggle_view_mode("Classic"),
             inputs=[],
-            outputs=[full_layout_row, simple_layout_row, split_layout_row, classic_btn, split_btn]
+            outputs=[full_layout_row, split_layout_row, classic_btn, split_btn]
         )
         
         split_btn.click(
             fn=lambda: toggle_view_mode("Split"),
             inputs=[],
-            outputs=[full_layout_row, simple_layout_row, split_layout_row, classic_btn, split_btn]
+            outputs=[full_layout_row, split_layout_row, classic_btn, split_btn]
         )
-        
-        # Layout toggle handler - syncs component values between layouts (OLD - kept for simple layout)
-        def toggle_layout_and_sync(mode, instr, crit, fmt, score, kw, reqs, model, temp, few_shot, num_ex, llm_parse):
-            """Toggle layout and sync component values bidirectionally"""
-            is_full = (mode == "Full Layout (with Profiles)")
-            
-            # Return visibility updates + synced values for all components
-            return (
-                gr.Row(visible=is_full),     # full_layout_row
-                gr.Row(visible=not is_full),  # simple_layout_row
-                # Sync to simple components
-                instr,     # simple_instruction
-                crit,      # simple_criteria  
-                fmt,       # simple_output_format
-                score,     # simple_max_score
-                kw,        # simple_ai_keywords
-                reqs,      # simple_additional_requirements
-                model,     # simple_model_dropdown
-                temp,      # simple_temperature
-                few_shot,  # simple_use_few_shot
-                num_ex,    # simple_num_examples
-                llm_parse, # simple_use_llm_parse
-                # Sync to full components (bidirectional)
-                instr,     # assignment_instruction
-                crit,      # grading_criteria
-                fmt,       # output_format
-                score,     # max_score
-                kw,        # ai_keywords
-                reqs,      # additional_requirements
-                model,     # model_dropdown
-                temp,      # temperature
-                few_shot,  # use_few_shot
-                num_ex,    # num_examples
-                llm_parse, # use_llm_parse
-            )
-        
-        # REMOVED: Old layout_mode.change handler (replaced with button handlers above)
         
         # Course refresh
         course_refresh_btn.click(
@@ -1110,61 +973,6 @@ def build_interface():
                      raw_llm_output, system_prompt_display, user_prompt_display, system_message]
         )
         
-        # Simple layout - Clear button
-        simple_clear_btn.click(
-            fn=lambda: ("", None),
-            outputs=[simple_submission_text, simple_file_upload]
-        )
-        
-        # Simple layout - Validate and grade (no tab switching needed)
-        def validate_simple_grading(text, file, instruction, criteria):
-            """Validate simple layout inputs before grading"""
-            is_valid, error_msg = validate_grading_input(text, file)
-            if not is_valid:
-                return error_msg
-            
-            # Also validate that instructions and rubric are provided
-            if not instruction or not instruction.strip():
-                return "⚠️ Instructions are required! Please enter assignment instructions."
-            if not criteria or not criteria.strip():
-                return "⚠️ Rubric is required! Please enter grading criteria."
-            
-            return ""  # Valid
-        
-        def simple_grade_with_validation(text, file, instruction, criteria, fmt, score, keywords, reqs, temp, model, use_llm, use_few_shot, num_examples):
-            """Grade in simple layout with validation - generator function"""
-            error_msg = validate_simple_grading(text, file, instruction, criteria)
-            if error_msg:
-                # Yield error state
-                yield (
-                    error_msg,  # preview (error message)
-                    "N/A",  # grade
-                    "",  # grading_reason
-                    "",  # student_feedback
-                    "",  # ai_keyword_result
-                    "",  # ai_disclosure_result
-                    0,  # context_bar
-                    "",  # context_details
-                    "",  # raw_llm_output
-                    "",  # system_prompt
-                    "",  # user_prompt
-                    error_msg  # system_message
-                )
-                return
-            
-            # Valid, proceed with grading - yield from the generator
-            yield from conditional_grade_with_loading(text, file, instruction, criteria, fmt, score, keywords, reqs, temp, model, use_llm, use_few_shot, num_examples)
-        
-        simple_grade_btn.click(
-            fn=simple_grade_with_validation,
-            inputs=[simple_submission_text, simple_file_upload, simple_instruction, simple_criteria,
-                simple_output_format, simple_max_score, simple_ai_keywords, simple_additional_requirements,
-                simple_temperature, simple_model_dropdown, simple_use_llm_parse, simple_use_few_shot, simple_num_examples],
-            outputs=[simple_submission_preview, simple_grade_result, simple_grading_reason, simple_student_feedback,
-                     simple_ai_keyword_result, simple_ai_disclosure_result, simple_context_bar, simple_context_details,
-                     simple_raw_llm_output, simple_system_prompt, simple_user_prompt, system_message]
-        )
-        
         # === SPLIT VIEW HANDLERS ===
         
         # Split view clear button
@@ -1218,6 +1026,21 @@ def build_interface():
             inputs=[split_student_feedback],
             outputs=[],
             js="(feedback) => { navigator.clipboard.writeText(feedback); return []; }"
+        )
+        
+        # Copy buttons for grade (uses JavaScript to copy to clipboard)
+        copy_grade_btn.click(
+            fn=None,
+            inputs=[grade_result],
+            outputs=[],
+            js="(grade) => { navigator.clipboard.writeText(grade); return []; }"
+        )
+        
+        copy_split_grade_btn.click(
+            fn=None,
+            inputs=[split_grade_result],
+            outputs=[],
+            js="(grade) => { navigator.clipboard.writeText(grade); return []; }"
         )
         
         # Save correction

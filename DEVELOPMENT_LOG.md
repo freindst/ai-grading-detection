@@ -14,6 +14,45 @@ This document tracks ongoing development activity, recent changes, and work in p
 - None
 
 ### Recently Completed
+- ✅ **UI: Added Copy Button for Grade** - Quick clipboard copy for extracted grade in Classic and Split views
+  - **Feature**: Added "📋 Copy" button next to "Extracted Grade" headline
+  - **Locations**: 
+    - Classic View: In header row next to "Extracted Grade" (lines 589-591)
+    - Split View: In header row next to "Extracted Grade" (lines 732-734)
+  - **Styling**: Same blue background (#2563eb) as student feedback copy button for consistency
+  - **Implementation**: Uses JavaScript `navigator.clipboard.writeText()` to copy grade to clipboard
+  - **User Benefit**: Quick copy of grade for pasting into LMS gradebooks or spreadsheets
+  - **Files**: `src/app.py` (UI components and event handlers)
+- ✅ **CODE CLEANUP: Removed Simple Layout** - Removed unused Simple Layout code (117 lines, 40+ references)
+  - **Reason**: Simple Layout was never accessible to users (no button, always hidden)
+  - **Split View Replacement**: Split View serves the same purpose (quick grading without course/profile UI)
+  - **Removed Components**: 
+    - Simple Layout UI structure (lines 698-814, 117 lines)
+    - `toggle_layout_and_sync` function (bidirectional sync logic)
+    - `validate_simple_grading` function
+    - `simple_grade_with_validation` function
+    - All Simple Layout event handlers (grade, clear buttons)
+    - All Simple Layout component references (40+ references)
+  - **Updated**: `toggle_view_mode` function now only handles Classic ↔ Split (removed simple_layout_row)
+  - **Result**: Cleaner codebase, reduced complexity, no functional change for users
+  - **Files**: `src/app.py` (removed ~200 lines of dead code)
+- ✅ **UI: Reordered Input Components - File Before Text** - File submission now appears before text submission
+  - **Change**: Swapped the order of file upload and text paste areas in both Classic and Split views
+  - **Locations**: 
+    - Classic View (Input tab): File upload (left column) → Text submission (right column)
+    - Split View: File upload → Text submission (vertical order)
+  - **Rationale**: File uploads are often the primary input method for grading assignments (PDFs, DOCX)
+  - **User Benefit**: More intuitive workflow - upload file first, then paste text as alternative
+  - **Files**: `src/app.py` (UI structure)
+- ✅ **UI: Repositioned Copy Button to Header** - Moved copy button to the top-right of student feedback panel
+  - **Change**: Copy button now appears in the header row, next to "Student Feedback" / "💬 Student Feedback" title
+  - **Position**: Right side of header (using `margin-left: auto` CSS)
+  - **Styling**: Blue background (#2563eb) with darker blue border (#1e40af) for clear visibility
+  - **Hover Effect**: Darker blue (#1d4ed8) on hover for better UX
+  - **Button Text**: Shortened to "📋 Copy" for compact header placement
+  - **Locations**: Classic View (line 604-606) and Split View (line 859-861)
+  - **User Benefit**: More intuitive placement, clearer visual hierarchy
+  - **Files**: `src/app.py` (UI structure and CSS)
 - ✅ **UI: Added Copy Button for Student Feedback** - Quick clipboard copy in Classic and Split views
   - **Feature**: Added "📋 Copy Student Feedback" button below student feedback textbox
   - **Locations**: 

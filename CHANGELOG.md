@@ -9,10 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Simple Layout**: Removed unused Simple Layout code (dead code cleanup)
+  - Simple Layout was never accessible to users (no toggle button, always hidden)
+  - Split View serves the same purpose with better UX
+  - Removed ~200 lines of code including UI components, functions, and event handlers
+  - Simplified `toggle_view_mode` function to only handle Classic ↔ Split views
+  - No user-facing impact (feature was never visible)
+
+### Changed
+- **Input Order**: File submission now appears before text submission in all views
+  - Classic View: File upload (left column) → Text submission (right column)
+  - Split View: File upload → Text submission (vertical order)
+  - More intuitive workflow for file-based grading (PDFs, DOCX, images)
+
 ### Added
+- **Copy Grade Button**: Added one-click copy button for extracted grade
+  - Button appears in the header next to "Extracted Grade" (top-right corner)
+  - Same distinctive blue styling as student feedback copy button for consistency
+  - Available in both Classic and Split views
+  - Convenient for quickly copying grades to LMS gradebooks or spreadsheets
 - **Copy Student Feedback Button**: Added one-click copy button for student feedback
-  - Button appears below student feedback textbox in both Classic and Split views
+  - Button appears in the header of student feedback panel (top-right corner)
+  - Distinctive blue background (#2563eb) with hover effect for easy identification
   - Uses JavaScript clipboard API for instant copying
+  - Shortened text "📋 Copy" for compact header placement
   - Convenient for pasting feedback into email, LMS, or other communication tools
 - **Split View Layout**: New streamlined layout mode for quick grading
   - Toggle between "Classic View" and "Split View" using two buttons at the top
