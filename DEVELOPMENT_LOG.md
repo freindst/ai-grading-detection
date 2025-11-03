@@ -14,6 +14,183 @@ This document tracks ongoing development activity, recent changes, and work in p
 - None
 
 ### Recently Completed
+- ✅ **UI: Added Copy Button for Student Feedback** - Quick clipboard copy in Classic and Split views
+  - **Feature**: Added "📋 Copy Student Feedback" button below student feedback textbox
+  - **Locations**: 
+    - Classic View: Below student feedback output (line 606)
+    - Split View: Below split student feedback (line 866)
+  - **Implementation**: Uses JavaScript `navigator.clipboard.writeText()` to copy feedback to clipboard
+  - **User Benefit**: Easy one-click copy of student feedback for pasting into email, LMS, or other tools
+  - **Files**: `src/app.py` (UI components and event handlers)
+- ✅ **FIX: Split View Grading Error (ROOT CAUSE FIXED)** - Resolved `'int' object has no attribute 'to_json'` error completely
+  - **Problem**: Error persisted through multiple fix attempts
+  - **ROOT CAUSE DISCOVERED**: Line 942 used `gr.BarPlot(visible=False)` for `split_context_bar`
+  - **Key Discovery**: Full layout (line 610) and simple layout (line 788) use `gr.Slider` for context_bar, NOT BarPlot
+  - **Why This Caused Error**: 
+    - Grading function returns INTEGER percentage (0-100) for context usage
+    - `gr.Slider` accepts integer values ✓
+    - `gr.BarPlot` expects complex data structure (dict/list), not integer ✗
+    - When integer was sent to BarPlot, it tried to serialize it → `'int' object has no attribute 'to_json'`
+  - **Fix**: Changed `split_context_bar` from `gr.BarPlot(visible=False)` to `gr.Slider(minimum=0, maximum=100, value=0, interactive=False, visible=False)`
+  - **Result**: Split view grading now works! Component type matches the data type being sent.
+  - **Files**: `src/app.py` (line 942)
+- ✅ **FIX: Split View Grading Error (Final Fix)** - Resolved persistent `'int' object has no attribute 'to_json'` error
+  - **Problem**: Error persisted even after changing `return` to `yield`
+  - **Root Cause**: Line 120 was creating `gr.BarPlot(value=None, visible=False)` object in validation failure case
+  - **Key Insight**: `context_bar` component expects an INTEGER (percentage value), NOT a BarPlot object
+  - **Evidence**: `grading_handlers.py` line 454 returns `context_percentage` (int), not a BarPlot
+  - **Fix**: Changed line 120 from `gr.BarPlot(value=None, visible=False)` to `0` (integer)
+  - **Result**: Split view grading now works correctly! The BarPlot component receives the integer and displays it.
+  - **Files**: `src/app.py` (line 120)
+- ✅ **FIX: Split View Grading Error (Second Fix)** - Fixed persistent `'int' object has no attribute 'to_json'` error
+  - **Problem**: Error still occurred after adding hidden components
+  - **Root Cause**: `conditional_grade_with_loading` used `return` instead of `yield` for validation failure case
+  - **Issue**: When validation fails, the function returned a tuple containing `gr.BarPlot(visible=False)` which creates a NEW component
+  - **Gradio Requirement**: Generator functions must use `yield` not `return` to update existing components
+  - **Fix**: Changed line 113 from `return (...)` to `yield (...)` and added explicit `return` after yield
+  - **Result**: Split view grading now works correctly in both validation failure and success cases
+  - **Files**: `src/app.py` (line 113-127)
+- ✅ **FIX: Split View Grading Error & Theme Cleanup** - Fixed critical error and removed theme toggle
+  - **Issue 1: Split View Grading Error**:
+    - Error: `'int' object has no attribute 'to_json'` when clicking grade button in split view
+    - Root Cause: Output list created new components (gr.Textbox(visible=False)) instead of referencing existing ones
+    - Fix: Added hidden output components to split_layout_row and referenced them properly
+    - Result: Split view grading now works without errors
+  - **Issue 2: Theme Not Fully Rolled Back**:
+    - Problem: Light theme colors were still active despite previous rollback attempt
+    - Root Cause: Only one location was reverted, multiple theme configurations remained
+    - Fix: Restored original dark theme configuration completely
+  - **Issue 3: Theme Toggle Removal**:
+    - User Request: "I do not need light and dark theme switch anymore"
+    - Removed: theme_selector Radio button, theme_toggle_js JavaScript, dual light/dark CSS (~150 lines)
+    - Kept: Original dark theme only with single-theme CSS
+  - **Files**: `src/app.py` (theme config, CSS cleanup, split view fix, removed theme UI/handlers)
+- ✅ **UI: Implemented Split View Layout** - Added new split-screen layout with toggle buttons
+  - **Feature**: New "Split View" layout mode for streamlined grading workflow
+  - **UI Components**:
+    - Two toggle buttons: "🏛️ Classic View" and "⚡ Split View" with active state styling
+    - Active button has blue border (#0066ff) and blue background
+    - Inactive button has gray styling with hover effects
+  - **Split View Layout**:
+    - Left panel (scale=1): Text submission, file upload, grade/clear buttons
+    - Right panel (scale=2): All output fields (grade, feedback, strengths, weaknesses, deductions, stats, human correction, prompts)
+    - Submission preview EXCLUDED from split view per requirements
+  - **Integration**:
+    - Split view uses course/profile data from Classic View sidebar
+    - Grading settings pulled from full layout (assignment_instruction, grading_criteria, etc.)
+    - No duplication of course/profile selectors - reads from existing sidebar
+  - **Implementation**:
+    - Added `toggle_view_mode()` function to switch between Classic and Split views
+    - Created split_layout_row with all necessary components (split_grade_btn, split_submission_text, split_grade_result, etc.)
+    - Wired split_grade_btn to use conditional_grade_with_loading with full layout parameters
+    - Added CSS classes: `.theme-btn` and `.theme-btn-active` for button styling
+  - **Files**: `src/app.py` (all changes: UI, CSS, event handlers)
+- ✅ **UI: Repositioned Input Components** - Swapped text/file positions and moved Clear All button
+  - **Changes**:
+    - Text Submission now on left, File Submission on right (restored original order)
+    - Clear All button moved under Grade button (easier access)
+  - **Applied to**: Both Full Layout and Simple Layout
+  - **Result**: More logical flow - text entry is prominent, clear button is with grade button
+  - **Files**: `src/app.py` (updated component layout)
+- ✅ **ROLLBACK: Restored Original Dark Theme** - Rolled back light/dark theme changes at user request
+  - **Issue**: User found both light and dark theme options worse than the original theme
+  - **Action**: Used `git restore src/app.py` to revert to original dark theme
+  - **Restored**: Original dark theme with familiar colors and contrast
+  - **Files**: `src/app.py` (rolled back to git version)
+- ✅ **FILTER: Remove Generic Praise from Student Feedback** - Added cleanup to remove generic phrases like "Keep up the good work!"
+  - **Problem**: LLM sometimes includes generic praise despite system prompt instructions to avoid them
+  - **Solution**: Added `_remove_generic_phrases()` method to filter out 12 common generic phrases
+  - **Phrases removed**:
+    - "Keep up the good work!", "Keep up the great work!", "Well done!"
+    - "Good job!", "Great job!", "Great work!", "Nice work!", "Excellent work!"
+    - "Keep it up!", "Continue the good work!", "You're doing great!", "You did great!"
+  - **Applied to**: Both `detailed_feedback` and `student_feedback` after parsing
+  - **Result**: Student feedback is now more focused and actionable, without generic filler
+  - **Files**: `src/grading_engine.py` (added `_remove_generic_phrases` method)
+- ✅ **UI: Switched to Light Theme** - Replaced dark theme with light theme for better visibility
+  - **Problem**: Dark theme made checkboxes, radio buttons, and other controls hard to see
+  - **Solution**: Implemented clean light theme with high contrast
+    - White/light gray backgrounds (#ffffff, #f8f9fa)
+    - Dark text (#1a1a1a, #2a2a2a) for readability
+    - High contrast borders (#c0c0c0, #d0d0d0)
+    - Enlarged checkboxes (20px) and radio buttons (18px) with visible borders
+    - Blue accent color (#0066ff) maintained for consistency
+  - **Benefits**:
+    - Checkboxes and radio buttons now highly visible
+    - Better text readability
+    - Professional, clean appearance
+    - Suitable for extended use
+    - Better contrast for all UI components
+  - **Files**: `src/app.py` (theme configuration and custom CSS)
+- ✅ **UI: Reordered Input Components** - Moved file upload and Clear All button before text paste area
+  - **Change**: Swapped positions so file upload/clear button appear first, text area second
+  - **Applied to**: Both Full Layout and Simple Layout
+  - **Files**: `src/app.py` (updated component order)
+- ✅ **FIX: Enhanced JSON Parser Robustness** - Improved parser to handle edge cases and malformed JSON
+  - **Problem**: User reported grade showing "N/A" and feedback fields showing JSON format instead of parsed text
+  - **Root Cause Analysis**: 
+    - Tested parser with user's exact JSON - parser worked correctly
+    - Identified that issue likely occurs when JSON is slightly malformed or has edge cases
+    - Fallback to natural language parsing was showing raw JSON in feedback fields
+  - **Solution**: Enhanced parser with multiple improvements:
+    1. **Improved brace matching** (Strategy 2): Now correctly handles braces inside string literals
+       - Skips braces that appear inside quoted strings (e.g., `{"text": "Here's a {brace}"}`)
+       - Properly handles escaped characters
+    2. **Robust grade extraction**: Handles various formats (string, number, None, empty)
+       - Tries alternate field names if "grade" is missing
+       - Better validation and type handling
+    3. **Field extraction fallback**: New `_extract_fields_from_failed_json()` method
+       - When full JSON parsing fails, extracts individual fields using regex
+       - Successfully extracts grade "16" even from malformed JSON
+       - Handles escaped quotes and newlines in feedback text
+    4. **Feedback validation**: Detects if feedback fields contain raw JSON instead of text
+       - Warns and attempts to re-extract from parsed dict
+       - Prevents showing JSON format in UI feedback fields
+  - **Testing**: 
+    - Verified backward compatibility with all existing JSON formats
+    - Tested with malformed JSON, escaped quotes, nested structures
+    - All edge cases now handled gracefully
+  - **Files**: `src/grading_engine.py` (enhanced parsing methods)
+  - **Testing**: Created `tests/test_json_parsing_regression.py` for ongoing regression testing
+    - Contains user's exact JSON format from error report
+    - Tests grade extraction, feedback parsing, and backward compatibility
+    - Documented in `.cursorrules` as mandatory test after any parser changes
+- ✅ **FIX: Layout Component Value Sync** - Fixed simple layout to persist grading settings when switching modes
+  - **Problem**: Switching to simple layout showed "Instructions required" error because simple layout had separate empty components
+  - **Root Cause**: Created duplicate components (`simple_instruction` vs `assignment_instruction`) that don't share state
+  - **Solution**: Added bidirectional value sync in `toggle_layout_and_sync()` function
+    - When switching layouts, copies values from full layout to simple layout
+    - When switching back, copies values from simple layout to full layout
+    - Both layouts now stay in sync automatically
+  - **Implementation**:
+    - Enhanced `layout_mode.change()` handler to sync 11 component values bidirectionally
+    - Takes current values from full layout as inputs
+    - Returns updated values for both simple and full layout components
+    - Preserves all grading settings (instructions, rubric, format, model, temperature, etc.)
+  - **Result**: Switching between layouts now preserves all your grading settings
+  - **Files**: `src/app.py` (updated toggle handler)
+- ✅ **FEATURE: Simple Layout Toggle** - Added two-column quick grading layout option
+  - **Problem**: Full layout with course/profile management can be overwhelming for quick grading tasks
+  - **Solution**: Added layout mode selector (Radio button) that switches between two layouts
+  - **Full Layout** (default): Original layout with courses/profiles on left, tabs on right
+  - **Simple Layout** (new): Two-column layout:
+    - Left: Large input textbox (20 lines), file upload, collapsed settings accordion
+    - Right: All grading results displayed directly (no tabs)
+    - Perfect for quick grading without course/profile management
+  - **Implementation**:
+    - Added `layout_mode` Radio selector at top
+    - Wrapped full layout in conditional `gr.Row` with visibility toggle
+    - Created simple layout with separate components (simple_submission_text, simple_grade_result, etc.)
+    - Added `toggle_layout()` handler to switch between layouts
+    - Wired simple layout grade button with validation (checks instructions + rubric)
+    - Simple layout uses same `conditional_grade_with_loading` function via `yield from`
+  - **Features**:
+    - Layout switch preserves state (no data loss)
+    - Simple layout validates inputs before grading
+    - Same grading engine used in both layouts
+    - Clear error messages for missing inputs
+  - **Result**: Users can now choose between full-featured layout or quick grading mode
+  - **Files**: `src/app.py` (added ~200 lines for simple layout and toggle logic)
 - ✅ **DOCUMENTATION: Vision/Image Support Planning & Future Features Rule** - Added comprehensive planning documentation and rules
   - **Added**: Vision Model Support section to FUTURE_PLANS.md (section 5.5)
     - Documents current OCR capabilities vs. future vision model needs

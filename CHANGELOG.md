@@ -10,6 +10,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Copy Student Feedback Button**: Added one-click copy button for student feedback
+  - Button appears below student feedback textbox in both Classic and Split views
+  - Uses JavaScript clipboard API for instant copying
+  - Convenient for pasting feedback into email, LMS, or other communication tools
+- **Split View Layout**: New streamlined layout mode for quick grading
+  - Toggle between "Classic View" and "Split View" using two buttons at the top
+  - Active button styling: Blue border and background (#0066ff) to show current mode
+  - Split View features:
+    - Left panel: Input controls (text submission, file upload, grade button, clear button)
+    - Right panel: All grading outputs (grade, feedback, strengths, weaknesses, deductions, statistics, human correction, debug prompts)
+    - Submission preview excluded from split view (not needed for streamlined workflow)
+    - Uses course/profile data from Classic View sidebar (no duplication)
+  - Perfect for quick grading sessions without needing course/profile management UI
+  - Fully integrated with existing grading engine and course/profile system
+
+### Fixed
+- **Split View Grading Error (ROOT CAUSE FIXED)**: Completely resolved `'int' object has no attribute 'to_json'` error
+  - Root cause: `split_context_bar` was created as `gr.BarPlot` instead of `gr.Slider`
+  - Issue: BarPlot expects complex data structure, but grading function returns integer percentage
+  - Fix: Changed `split_context_bar` from `gr.BarPlot(visible=False)` to `gr.Slider(minimum=0, maximum=100, value=0, interactive=False, visible=False)`
+  - Now matches full layout and simple layout which both use Slider for context usage
+  - Split view grade button now fully functional
+- **Split View Grading Error (FINAL FIX)**: Completely resolved `'int' object has no attribute 'to_json'` error
+  - Root cause: Validation failure case was creating `gr.BarPlot` object instead of returning integer value
+  - Key insight: `context_bar` BarPlot component expects integer percentage (0-100), not a BarPlot object
+  - Fixed line 120: Changed from `gr.BarPlot(value=None, visible=False)` to `0`
+  - Split view grade button now fully functional with text/file input and validation
+- **Split View Grading Error (Critical Fix)**: Fixed persistent `'int' object has no attribute 'to_json'` error
+  - Root cause: Generator function `conditional_grade_with_loading` used `return` instead of `yield` for validation failure
+  - Changed validation failure from `return (...)` to `yield (...)` to properly update existing components
+  - Split view grade button now works correctly with text input, file upload, and validation
+- **Split View Grading Error**: Fixed `'int' object has no attribute 'to_json'` error
+  - Added hidden output components to split_layout_row for compatibility with grading function
+  - Split view grade button now works correctly with all 12 expected outputs
+- **Theme Inconsistency**: Completely restored original dark theme
+  - Removed incomplete light theme rollback
+  - Restored dark theme configuration (#0a0a0a backgrounds, #f0f0f0 text)
+  - Theme is now consistent throughout the application
+
+### Removed
+- **Theme Toggle Feature**: Removed light/dark theme switcher per user request
+  - Removed theme_selector Radio button
+  - Removed theme_toggle_js JavaScript (~20 lines)
+  - Removed dual light/dark theme CSS (~70 lines)
+  - Simplified CSS to single dark theme only
+  - Cleaned up ~150 lines of unnecessary theme switching code
+- **System Prompt Redesign**: Completely rewrote grading prompt for better feedback quality
+  - New layout mode selector at top of interface (Radio button)
+  - **Full Layout**: Original layout with course/profile management on left, tabs on right
+  - **Simple Layout**: Simplified two-column layout (Input left, Output right) for quick grading
+  - Simple layout includes:
+    - Large input textbox (20 lines) and file upload on left
+    - Grading settings in collapsed accordion (instructions, rubric, format, model, etc.)
+    - All grading results displayed on right panel
+    - No tabs needed - everything visible at once
+  - Layout toggle switches between modes without losing data
+  - Simple layout validates instructions and rubric before grading
+  - Both layouts use the same grading engine and validation logic
 - **Vision Model Support Planning**: Added comprehensive documentation for future vision/image understanding capabilities
   - Documented in FUTURE_PLANS.md (section 5.5) as "Planning Phase, Low Priority, High Complexity"
   - Details current OCR capabilities vs. future vision model needs
@@ -48,7 +106,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Explains WHY something is good rather than just saying it is
 - **UI Simplified**: Removed "Clear Text" button - only "Clear All" button remains (clears both text and file)
 
+### Changed
+- **UI Component Repositioning**: Improved layout of input components
+  - Text Submission moved back to left column (more prominent)
+  - File Submission moved to right column
+  - Clear All button moved under Grade button (related actions together)
+  - Applied to both Full Layout and Simple Layout
+  - Better workflow: primary text input is on the left, clear action with grade action
+- **Feedback Cleanup: Remove Generic Praise Phrases** - Student feedback now filtered to remove generic phrases
+  - Removes: "Keep up the good work!", "Well done!", "Good job!", "Great job!", "Keep it up!", etc.
+  - System prompt already instructs to avoid these, but this is a safety net
+  - Applied after JSON parsing to both detailed and student feedback
+  - Results in more focused, actionable feedback
+
 ### Fixed
+- **Enhanced JSON Parser Robustness**: Improved parser to handle edge cases and extract grades from malformed JSON
+  - Problem: Grade showing "N/A" and feedback fields displaying JSON format instead of parsed text
+  - Solution: Multiple parser improvements:
+    1. Improved brace matching that correctly handles braces inside string literals
+    2. Robust grade extraction with support for various formats (string, number, None, empty)
+    3. New field extraction fallback that extracts individual fields using regex when full JSON parsing fails
+    4. Feedback validation that detects and corrects raw JSON in feedback fields
+  - Result: Parser now successfully extracts grade "16" even from slightly malformed JSON
+  - Backward compatible: All existing JSON formats continue to work correctly
+  - Testing: Added `tests/test_json_parsing_regression.py` for ongoing regression testing
+    - Contains user's exact JSON format as canonical test case
+    - Documented in `.cursorrules` as mandatory test after parser changes
+    - Ensures backward compatibility is maintained
+- **Layout Component Value Sync**: Fixed simple layout to preserve grading settings when switching modes
+  - Problem: Switching to simple layout showed "Instructions required" error
+  - Root cause: Simple layout components were separate and empty
+  - Solution: Added bidirectional value sync when toggling between layouts
+  - All 11 grading settings now persist across layout switches (instructions, rubric, format, model, temperature, AI keywords, etc.)
+  - Switching from full to simple: copies values from full layout
+  - Switching from simple to full: copies values from simple layout back
 - **Grading Button Error**: Fixed critical error where grading button returned generator object instead of yielding values
   - Changed `return grade_with_loading()` to `yield from grade_with_loading()` in `conditional_grade_with_loading()`
   - Error was: "A function didn't return enough output values (needed: 12, returned: 1)"

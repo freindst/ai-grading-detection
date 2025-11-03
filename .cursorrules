@@ -123,6 +123,40 @@ After making ANY changes, you MUST update:
 - Run ruff check even for small changes - indentation errors are easy to introduce
 - If terminal commands fail, fall back to `read_lints` tool
 
+#### CRITICAL: JSON Parser Regression Testing
+**MANDATORY**: After ANY changes to JSON parsing logic, you MUST run the regression test.
+
+**When to run this test:**
+- After modifying `src/grading_engine.py` (especially `parse_grading_output`, `_build_parsed_result`, `_extract_fields_from_failed_json`)
+- After modifying `src/output_parser.py`
+- After changing any JSON parsing, extraction, or formatting logic
+- Before marking any parser-related changes as complete
+
+**Test command:**
+```bash
+run_terminal_cmd("cd /mnt/e/GradingSystem && python3 tests/test_json_parsing_regression.py")
+```
+
+**What the test does:**
+- Tests parser with user's exact JSON format from the error report (November 2025)
+- Verifies grade extraction (should extract "16" correctly)
+- Verifies feedback fields are parsed text, not raw JSON
+- Tests multiple JSON formats (plain, with surrounding text, markdown code blocks)
+- Ensures backward compatibility after parser changes
+
+**Expected result:**
+- All tests must pass (✅ ALL TESTS PASSED)
+- If any test fails, the parser has regressed and needs to be fixed
+- Do NOT mark parser changes as complete if regression test fails
+
+**Why this matters:**
+- The user's JSON format is the canonical test case
+- Parser changes can break existing functionality without obvious errors
+- This test catches regressions before they reach production
+- Ensures we maintain compatibility with the exact JSON structure that was previously failing
+
+**Test file location:** `tests/test_json_parsing_regression.py`
+
 #### CRITICAL: Indentation Error Prevention Strategy
 **Lesson Learned (Nov 2, 2025)**: Indentation errors CASCADE - fixing one line may expose more errors in nested blocks.
 
@@ -231,6 +265,20 @@ When making changes:
 3. Test with at least one example
 4. Verify no new linter errors: Check with IDE
 5. Document any breaking changes
+
+### JSON Parser Regression Testing (MANDATORY)
+**If you modify ANY JSON parsing logic**, you MUST run:
+```bash
+python3 tests/test_json_parsing_regression.py
+```
+
+This ensures:
+- Grade extraction still works (extracts "16" from user's JSON)
+- Feedback fields show parsed text, not raw JSON
+- Backward compatibility is maintained
+- No regressions introduced
+
+**See "CRITICAL: JSON Parser Regression Testing" section above for full details.**
 
 ## Dependencies
 

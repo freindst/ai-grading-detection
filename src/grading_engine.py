@@ -210,20 +210,38 @@ Please grade this submission according to the criteria provided above."""
         
         # Strategy 2: Find JSON object (non-greedy, balanced braces)
         # This is more robust than the greedy [\s\S]* pattern
+        # IMPORTANT: Account for braces inside string literals (they don't count)
         json_start = llm_output.find('{')
         if json_start != -1:
             print(f"Strategy 2: Found opening brace at position {json_start}")
-            # Find matching closing brace
+            # Find matching closing brace, skipping braces inside quoted strings
             brace_count = 0
             json_end = -1
+            in_string = False
+            escape_next = False
+            
             for i, char in enumerate(llm_output[json_start:], start=json_start):
-                if char == '{':
-                    brace_count += 1
-                elif char == '}':
-                    brace_count -= 1
-                    if brace_count == 0:
-                        json_end = i + 1
-                        break
+                if escape_next:
+                    escape_next = False
+                    continue
+                
+                if char == '\\':
+                    escape_next = True
+                    continue
+                
+                if char == '"' and not escape_next:
+                    in_string = not in_string
+                    continue
+                
+                # Only count braces when not inside a string
+                if not in_string:
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            json_end = i + 1
+                            break
             
             if json_end > json_start:
                 json_str = llm_output[json_start:json_end]
@@ -255,8 +273,18 @@ Please grade this submission according to the criteria provided above."""
         else:
             print("Strategy 3: Greedy regex found nothing")
         
-        # Fallback: Use regex-based parsing for natural language output
-        print("❌ ALL JSON PARSING STRATEGIES FAILED - Using regex fallback")
+        # Fallback: Try to extract JSON fields even if parsing failed
+        # This handles cases where JSON is slightly malformed but still extractable
+        print("❌ ALL JSON PARSING STRATEGIES FAILED - Attempting field extraction from raw text")
+        
+        # Try to extract individual fields using regex (even if full JSON parse failed)
+        fallback_result = self._extract_fields_from_failed_json(llm_output)
+        if fallback_result and fallback_result.get('grade') != 'N/A':
+            print("✓ Successfully extracted fields from failed JSON using regex")
+            return fallback_result
+        
+        # Last resort: Use regex-based parsing for natural language output
+        print("⚠️ Field extraction also failed - Using regex fallback")
         return self._parse_natural_language(llm_output)
     
     def _build_parsed_result(self, parsed: Dict) -> Dict:
@@ -292,21 +320,67 @@ Please grade this submission according to the criteria provided above."""
         # Clean up AI detection text if present
         if detailed_feedback:
             detailed_feedback = self._remove_ai_detection_text(detailed_feedback)
+            detailed_feedback = self._remove_generic_phrases(detailed_feedback)
         if student_feedback:
             student_feedback = self._remove_ai_detection_text(student_feedback)
+            student_feedback = self._remove_generic_phrases(student_feedback)
         
-        # Extract grade - handle both string and numeric
+        # Extract grade - handle both string and numeric, with robust validation
         grade = parsed.get("grade", "N/A")
-        if grade and str(grade).strip():
-            grade = str(grade).strip()
-        else:
+        
+        # Handle various formats: string, number, None, empty
+        if grade is None:
             grade = "N/A"
+        elif isinstance(grade, (int, float)):
+            # Convert numeric grade to string
+            grade = str(int(grade))
+        elif isinstance(grade, str):
+            grade = grade.strip()
+            # Check if it's actually empty after stripping
+            if not grade:
+                grade = "N/A"
+        else:
+            # Unexpected type, convert to string
+            grade = str(grade).strip() if grade else "N/A"
+        
+        # Final validation - ensure we have a valid grade
+        if not grade or grade == "N/A":
+            # Try to extract from other fields if grade is missing
+            # Sometimes LLM puts grade in a different field
+            for alt_field in ["score", "final_grade", "grade_value"]:
+                alt_grade = parsed.get(alt_field)
+                if alt_grade:
+                    grade = str(alt_grade).strip()
+                    print(f"✓ Found grade in alternate field '{alt_field}': {grade}")
+                    break
+        
+        # Validate that feedback fields contain actual text, not JSON strings
+        # This can happen if JSON parsing partially failed or returned wrong structure
+        if detailed_feedback and isinstance(detailed_feedback, str):
+            # Check if it looks like JSON (starts with '{' and contains JSON-like structure)
+            if detailed_feedback.strip().startswith('{') and '"grade"' in detailed_feedback:
+                print("⚠️ WARNING: detailed_feedback appears to be raw JSON, attempting to extract text")
+                # Try to re-extract from parsed dict
+                detailed_feedback = parsed.get("detailed_feedback", "")
+                if isinstance(detailed_feedback, str) and detailed_feedback.strip().startswith('{'):
+                    # Still JSON, something went wrong - use fallback
+                    detailed_feedback = ""
+        
+        if student_feedback and isinstance(student_feedback, str):
+            # Check if it looks like JSON
+            if student_feedback.strip().startswith('{') and '"grade"' in student_feedback:
+                print("⚠️ WARNING: student_feedback appears to be raw JSON, attempting to extract text")
+                # Try to re-extract from parsed dict
+                student_feedback = parsed.get("student_feedback", "")
+                if isinstance(student_feedback, str) and student_feedback.strip().startswith('{'):
+                    # Still JSON, something went wrong - use fallback
+                    student_feedback = ""
         
         return {
             "parse_method": "json",
             "grade": grade,
-            "detailed_feedback": detailed_feedback or "N/A",
-            "student_feedback": student_feedback or "N/A",
+            "detailed_feedback": detailed_feedback if detailed_feedback else "N/A",
+            "student_feedback": student_feedback if student_feedback else "N/A",
             "strengths": parsed.get("strengths", []),
             "weaknesses": parsed.get("weaknesses", []),
             "deductions": parsed.get("deductions", []),
@@ -360,6 +434,137 @@ Please grade this submission according to the criteria provided above."""
         cleaned_text = re.sub(r'\n{3,}', '\n\n', cleaned_text)
         
         return cleaned_text
+    
+    def _remove_generic_phrases(self, text: str) -> str:
+        """
+        Remove generic praise phrases that don't add value to feedback.
+        
+        The system prompt explicitly instructs to avoid these phrases, but sometimes
+        the LLM includes them anyway. This is a safety net to remove them.
+        
+        Args:
+            text: Feedback text that may contain generic phrases
+        
+        Returns:
+            Cleaned text without generic praise phrases
+        """
+        if not text:
+            return text
+        
+        # List of generic phrases to remove (case-insensitive)
+        generic_phrases = [
+            r'Keep up the good work!?',
+            r'Keep up the great work!?',
+            r'Well done!?',
+            r'Good job!?',
+            r'Great job!?',
+            r'Great work!?',
+            r'Nice work!?',
+            r'Excellent work!?',
+            r'Keep it up!?',
+            r'Continue the good work!?',
+            r'You\'re doing great!?',
+            r'You did great!?',
+        ]
+        
+        cleaned_text = text
+        
+        # Remove each generic phrase
+        for phrase_pattern in generic_phrases:
+            # Try to match at the end of sentences or standalone
+            patterns_to_try = [
+                # At the end with punctuation
+                r'\s+' + phrase_pattern + r'\s*$',
+                # At the end of a sentence
+                r'\s+' + phrase_pattern + r'\s+',
+                # Standalone with surrounding whitespace
+                r'^\s*' + phrase_pattern + r'\s*$',
+                # After punctuation
+                r'\.\s+' + phrase_pattern,
+            ]
+            
+            for pattern in patterns_to_try:
+                cleaned_text = re.sub(pattern, '. ', cleaned_text, flags=re.IGNORECASE)
+        
+        # Clean up any resulting multiple spaces or periods
+        cleaned_text = re.sub(r'\s{2,}', ' ', cleaned_text)
+        cleaned_text = re.sub(r'\.{2,}', '.', cleaned_text)
+        cleaned_text = re.sub(r'\.\s*\.', '.', cleaned_text)
+        
+        # Clean up trailing/leading whitespace
+        cleaned_text = cleaned_text.strip()
+        
+        # Remove trailing period-space if it's now at the end
+        cleaned_text = re.sub(r'\.\s*$', '.', cleaned_text)
+        
+        return cleaned_text
+    
+    def _extract_fields_from_failed_json(self, text: str) -> Dict:
+        """
+        When JSON parsing fails, try to extract individual fields using regex.
+        This is more robust than full JSON parsing for slightly malformed JSON.
+        """
+        result = {
+            "parse_method": "regex_extraction",
+            "grade": "N/A",
+            "detailed_feedback": "",
+            "student_feedback": "",
+            "strengths": [],
+            "weaknesses": [],
+            "deductions": [],
+            "ai_keywords_found": [],
+            "confidence": "low"
+        }
+        
+        # Extract grade field (most critical)
+        grade_patterns = [
+            r'"grade"\s*:\s*"([^"]+)"',  # "grade": "16"
+            r'"grade"\s*:\s*(\d+)',      # "grade": 16
+            r'"grade"\s*:\s*"([A-E][\+\-]?)"',  # "grade": "A"
+        ]
+        for pattern in grade_patterns:
+            match = re.search(pattern, text)
+            if match:
+                result["grade"] = match.group(1).strip()
+                print(f"✓ Extracted grade from failed JSON: '{result['grade']}'")
+                break
+        
+        # Extract detailed_feedback
+        detailed_patterns = [
+            r'"detailed_feedback"\s*:\s*"((?:[^"\\]|\\.)*)"',  # Handles escaped quotes
+            r'"detailed_feedback"\s*:\s*"([^"]+)"',  # Simple version
+        ]
+        for pattern in detailed_patterns:
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                # Unescape common escape sequences
+                feedback = match.group(1)
+                feedback = feedback.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
+                result["detailed_feedback"] = feedback.strip()
+                if result["detailed_feedback"]:
+                    print(f"✓ Extracted detailed_feedback ({len(result['detailed_feedback'])} chars)")
+                    break
+        
+        # Extract student_feedback
+        student_patterns = [
+            r'"student_feedback"\s*:\s*"((?:[^"\\]|\\.)*)"',
+            r'"student_feedback"\s*:\s*"([^"]+)"',
+        ]
+        for pattern in student_patterns:
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                feedback = match.group(1)
+                feedback = feedback.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
+                result["student_feedback"] = feedback.strip()
+                if result["student_feedback"]:
+                    print(f"✓ Extracted student_feedback ({len(result['student_feedback'])} chars)")
+                    break
+        
+        # Only return if we extracted at least the grade
+        if result["grade"] != "N/A":
+            return result
+        
+        return None  # Signal that extraction failed
     
     def _parse_natural_language(self, text: str) -> Dict:
         """
