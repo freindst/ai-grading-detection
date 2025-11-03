@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Vision Model Support Planning**: Added comprehensive documentation for future vision/image understanding capabilities
+  - Documented in FUTURE_PLANS.md (section 5.5) as "Planning Phase, Low Priority, High Complexity"
+  - Details current OCR capabilities vs. future vision model needs
+  - Includes requirements, technical challenges, dependencies, and implementation steps
+  - Note: This is a planned feature, not implemented yet
+- **Future Features Implementation Rules**: Added critical rules to .cursorrules to prevent accidental implementation
+  - New "For Future Features / TODO Items" workflow section
+  - Rule: FUTURE_PLANS.md items are for planning only, not immediate implementation
+  - Only implement when user explicitly requests (e.g., "implement this", "do this now")
+  - Added special case handling for when users mention FUTURE_PLANS features
 - **Input Validation**: Grade button now validates input before processing
   - Checks if text or file is provided before grading
   - Shows clear error message: "⚠️ No input provided. Please paste text or upload a file before grading."
@@ -39,6 +49,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UI Simplified**: Removed "Clear Text" button - only "Clear All" button remains (clears both text and file)
 
 ### Fixed
+- **Grading Button Error**: Fixed critical error where grading button returned generator object instead of yielding values
+  - Changed `return grade_with_loading()` to `yield from grade_with_loading()` in `conditional_grade_with_loading()`
+  - Error was: "A function didn't return enough output values (needed: 12, returned: 1)"
+  - Root cause: returning a generator gives 1 object, yielding from it gives 12 separate values
+  - Grading now works correctly with all 12 output fields populated
+  - AI Detection Keywords already handled as optional throughout pipeline (no changes needed)
+- **Save Profile Button Error**: Fixed "Save as New Profile" button that threw "Textbox.__init__() got unexpected keyword 'choices'"
+  - Changed all profile handler functions to use `gr.update()` instead of `gr.Dropdown()` for dropdown updates
+  - Fixed return value counts: `create_profile()` returns 4 values, `update_profile_action()` returns 10 values, `delete_profile_action()` returns 4 values
+  - All dropdown updates now use correct Gradio update format
+  - Button now works correctly and profile list refreshes after creation
+- **Create Course Button Not Working**: Fixed course creation button that was not completing
+  - Fixed return value mismatch: `create_course()` now returns 2 values matching 2 outputs
+  - Changed dropdown updates to use `gr.update()` instead of `gr.Dropdown()` objects
+  - Updated all course handler functions (`create_course`, `update_course_action`, `delete_course_action`, `load_courses_dropdown`) to use correct Gradio update format
+  - Button now works correctly and dropdown refreshes after course creation
 - **JSON Parsing Failure**: Fixed grading output displaying raw JSON instead of parsed fields
   - Implemented multi-strategy JSON parsing with 3 fallback methods
   - Strategy 1: Extract from markdown code blocks (```json ... ```)

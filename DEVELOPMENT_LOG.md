@@ -4,7 +4,7 @@ This document tracks ongoing development activity, recent changes, and work in p
 
 **Project**: Grading Assistant System  
 **Status**: Production Ready (v1.0.0)  
-**Last Updated**: November 2, 2025
+**Last Updated**: November 3, 2025
 
 ---
 
@@ -14,6 +14,62 @@ This document tracks ongoing development activity, recent changes, and work in p
 - None
 
 ### Recently Completed
+- ✅ **DOCUMENTATION: Vision/Image Support Planning & Future Features Rule** - Added comprehensive planning documentation and rules
+  - **Added**: Vision Model Support section to FUTURE_PLANS.md (section 5.5)
+    - Documents current OCR capabilities vs. future vision model needs
+    - Details requirements: vision-capable Ollama models, multimodal API support, image extraction from PDFs/DOCX
+    - Lists technical challenges, dependencies, and implementation steps
+    - Marked as "Planning Phase, Low Priority, High Complexity"
+  - **Added**: New rule to .cursorrules for Future Features/TODO items
+    - Critical rule: FUTURE_PLANS.md items are for planning, NOT immediate implementation
+    - Only implement when user explicitly requests it
+    - Clear workflow: check FUTURE_PLANS.md → document → don't implement unless asked
+  - **Added**: Special case handling in .cursorrules for when user mentions FUTURE_PLANS features
+    - Distinguishes between "implement now" vs "discuss/document"
+    - Guidance to ask user if unclear
+  - **Result**: Future features properly documented and protected from accidental implementation
+  - **Files**: `FUTURE_PLANS.md` (added section 5.5), `.cursorrules` (added "For Future Features" section and special case)
+- ✅ **BUG FIX: Grading Button Generator Error** - Fixed critical error where grading returned generator object instead of values
+  - **Problem**: Clicking Grade button triggered error: "A function (conditional_grade_with_loading) didn't return enough output values (needed: 12, returned: 1)"
+  - **Root Cause**: 
+    - Line 129 in `src/app.py` used `return grade_with_loading()` instead of `yield from`
+    - Returning a generator gives you 1 generator object
+    - Yielding from a generator properly yields each value it produces (12 values)
+    - Gradio expected 12 separate outputs but got 1 generator object
+  - **Solution**: 
+    - Changed `return grade_with_loading(text, file, *args)` to `yield from grade_with_loading(text, file, *args)`
+    - `conditional_grade_with_loading` now properly acts as a generator
+  - **Verification**: 
+    - Confirmed AI Detection Keywords already optional (no changes needed)
+    - `ai_detector.detect_keywords()` checks for empty keywords and returns `[]`
+    - All 12 return values verified in `grade_submission()`
+  - **Result**: Grade button now works correctly with all output fields populated
+  - **Files**: `src/app.py` (line 129)
+- ✅ **BUG FIX: Save Profile Button Error** - Fixed profile save button that threw "Textbox.__init__() got unexpected keyword 'choices'"
+  - **Problem**: "Save as New Profile" button triggered error about Textbox receiving 'choices' argument
+  - **Root Cause**: 
+    - Profile handlers used `gr.Dropdown()` objects instead of `gr.update()` for dropdown updates
+    - Return value counts didn't match output counts (extra empty strings)
+    - Same issue as course handlers - incorrect Gradio update format
+  - **Solution**: 
+    - Fixed `load_profiles_for_course()` to use `gr.update()` format
+    - Fixed `create_profile()` to return 4 values (removed extra empty string)
+    - Fixed `update_profile_action()` to return 10 values (removed extra empty string)
+    - Fixed `delete_profile_action()` to return 4 values (removed extra empty string)
+  - **Result**: Save Profile button now works correctly and profile list refreshes after creation
+  - **Files**: `src/ui/profile_handlers.py` (all functions updated)
+- ✅ **BUG FIX: Create Course Button Not Working** - Fixed course creation button that was failing silently
+  - **Problem**: Create Course button clicked but nothing happened, no course created
+  - **Root Cause**: 
+    - `create_course()` function returned 3 values but handler only had 2 outputs
+    - Dropdown updates used incorrect format: `gr.Dropdown()` objects instead of `gr.update()`
+    - Return value mismatch caused Gradio to silently fail
+  - **Solution**: 
+    - Fixed `create_course()` to return exactly 2 values (system_message, course_dropdown)
+    - Changed all dropdown updates to use `gr.update(choices=..., value=...)` format
+    - Updated all course handler functions: `create_course`, `update_course_action`, `delete_course_action`, `load_courses_dropdown`
+  - **Result**: Create Course button now works correctly and dropdown refreshes after creation
+  - **Files**: `src/ui/course_handlers.py` (all functions updated)
 - ✅ **IMPROVEMENT: No Generic Praise** - Instructed LLM to avoid generic praise phrases in student feedback
   - **Problem**: LLM was using generic phrases like "Good job on your research paper", "Keep up the good work"
   - **Solution**: Added explicit instructions in `src/grading_engine.py` system prompt

@@ -2,7 +2,7 @@
 
 This document tracks all known bugs, issues, and their resolution status.
 
-**Last Updated**: November 2, 2025
+**Last Updated**: November 3, 2025
 
 ---
 
@@ -27,6 +27,69 @@ This document tracks all known bugs, issues, and their resolution status.
 ---
 
 ## Resolved Issues
+
+#### Issue #55: Grading Button Error - Generator Return Value Mismatch ✅
+- **Date Reported**: November 3, 2025
+- **Date Resolved**: November 3, 2025
+- **Severity**: Critical
+- **Component**: Grading System (src/app.py)
+- **Description**: Grading button triggered error: "A function (conditional_grade_with_loading) didn't return enough output values (needed: 12, returned: 1). Output values returned: [<generator object grade_with_loading at 0x...>]"
+- **Root Cause**: 
+  - Line 129 in `src/app.py` used `return grade_with_loading(...)` instead of `yield from grade_with_loading(...)`
+  - When you `return` a generator, you get a single generator object (1 value)
+  - When you `yield from` a generator, you properly yield each value it produces (12 values)
+  - Gradio expected 12 separate output values but received 1 generator object
+- **Solution**: 
+  - Changed `return grade_with_loading(text, file, *args)` to `yield from grade_with_loading(text, file, *args)`
+  - This properly delegates to the generator and yields each value (12 outputs)
+  - `conditional_grade_with_loading` now correctly acts as a generator function
+- **Verification**: 
+  - AI Detection Keywords field already handles empty values gracefully (optional)
+  - `ai_detector.detect_keywords()` checks for empty keywords and returns `[]`
+  - All return values verified: `grade_submission()` returns 12 values correctly
+  - No changes needed to keyword handling - already optional throughout pipeline
+- **Files Changed**: 
+  - `src/app.py` (line 129: changed `return` to `yield from`)
+- **Status**: Resolved
+
+#### Issue #54: Save Profile Button Error - Textbox.__init__() got unexpected keyword 'choices' ✅
+- **Date Reported**: November 3, 2025
+- **Date Resolved**: November 3, 2025
+- **Severity**: High
+- **Component**: Profile Management (src/ui/profile_handlers.py)
+- **Description**: "Save as New Profile" button triggered error: "Textbox.__init__() got an unexpected keyword argument 'choices'"
+- **Root Cause**: 
+  - Profile handler functions were using `gr.Dropdown()` objects instead of `gr.update()` for dropdown updates
+  - `gr.Dropdown()` objects were being passed to Textbox components, causing the error
+  - Same issue as course handlers - incorrect Gradio update format
+- **Solution**: 
+  - Fixed `load_profiles_for_course()` to use `gr.update(choices=..., value=...)` instead of `gr.Dropdown()`
+  - Fixed `create_profile()` to return 4 values (removed extra empty string) matching 4 outputs
+  - Fixed `update_profile_action()` to return 10 values (removed extra empty string) matching 10 outputs
+  - Fixed `delete_profile_action()` to return 4 values (removed extra empty string) matching 4 outputs
+  - All dropdown updates now use `gr.update()` format consistently
+- **Files Changed**: 
+  - `src/ui/profile_handlers.py` (all functions updated to use `gr.update()` format, fixed return value counts)
+- **Status**: Resolved
+
+#### Issue #53: Create Course Button Not Working ✅
+- **Date Reported**: November 3, 2025
+- **Date Resolved**: November 3, 2025
+- **Severity**: High
+- **Component**: Course Management (src/ui/course_handlers.py)
+- **Description**: Create Course button was not completing the course creation. Button clicked but nothing happened.
+- **Root Cause**: 
+  - Function `create_course()` returned 3 values but handler only had 2 outputs defined
+  - Incorrect dropdown update format: returning `gr.Dropdown()` objects instead of `gr.update()` calls
+  - Return value mismatch caused Gradio to silently fail
+- **Solution**: 
+  - Fixed `create_course()` to return exactly 2 values matching the 2 outputs (system_message, course_dropdown)
+  - Changed all dropdown updates to use `gr.update(choices=..., value=...)` instead of `gr.Dropdown()` objects
+  - Fixed `load_courses_dropdown()`, `update_course_action()`, and `delete_course_action()` to use correct update format
+  - Result: Create Course button now works correctly and updates dropdown after creation
+- **Files Changed**: 
+  - `src/ui/course_handlers.py` (all functions updated to use `gr.update()` format)
+- **Status**: Resolved
 
 #### Issue #52: Sticky Header/Tab CSS Not Working Correctly ✅
 - **Date Reported**: November 3, 2025

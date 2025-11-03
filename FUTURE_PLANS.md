@@ -207,6 +207,53 @@ numpy>=1.21.0                 # Vector operations
 - Extract text from complex PDFs with tables/figures
 - Support code execution and testing
 
+### 5.5 Vision Model Support for Image Understanding
+**Status**: Planning Phase  
+**Priority**: Low  
+**Complexity**: High
+
+**Current State**:
+- System supports OCR (text extraction from images) using Tesseract
+- Can process standalone image files (.png, .jpg, .jpeg, .gif, .webp)
+- PDF/DOCX parsing extracts only text, ignores embedded images
+- Uses text-only models (mistral, qwen2.5-coder, llama3.1)
+
+**Goal**:
+Enable LLM to understand visual content in documents (diagrams, charts, graphs, handwritten work, screenshots) rather than just extracting text.
+
+**Requirements**:
+1. Switch to vision-capable Ollama model (e.g., `llava`, `llava-llama3`, `bakllava`, `moondream`)
+2. Modify `src/llm_client.py` to support multimodal API calls (image + text)
+3. Enhance `src/document_parser.py` to:
+   - Extract embedded images from PDFs (using libraries like `pdf2image`, `pymupdf`)
+   - Extract embedded images from DOCX files (using `python-docx` image extraction)
+   - Pass images directly to vision model instead of OCR-only approach
+4. Update `src/grading_engine.py` to handle image data in prompts
+5. Modify UI to show/extract images from uploaded documents
+
+**Technical Challenges**:
+- Vision models require different API format (base64-encoded images or image URLs)
+- Images embedded in PDFs/DOCX need extraction before passing to model
+- Larger context windows needed for multimodal inputs
+- Performance: Vision models are typically slower than text-only models
+
+**Dependencies**:
+```txt
+pdf2image>=1.16.0    # Extract images from PDFs
+pymupdf>=1.23.0      # Alternative PDF image extraction
+Pillow>=10.0.0       # Already installed, image processing
+```
+
+**Implementation Steps** (if/when implemented):
+1. Research vision model options in Ollama
+2. Update `llm_client.py` with multimodal support
+3. Add image extraction methods to `document_parser.py`
+4. Test with sample documents containing images
+5. Update grading engine to combine image and text in prompts
+6. Add UI indicators for images detected in documents
+
+**Note**: Current OCR approach works for text-heavy images but cannot understand visual concepts, diagrams, or complex layouts. This feature would enable true visual understanding.
+
 ### 5.4 Collaborative Grading
 - Share example libraries across instructors
 - Federated learning across institutions
@@ -233,7 +280,7 @@ numpy>=1.21.0                 # Vector operations
 
 ---
 
-**Last Updated**: November 2, 2025  
+**Last Updated**: November 3, 2025  
 **Status**: Planning Phase  
 **Priority**: Medium (after core features stabilize)
 

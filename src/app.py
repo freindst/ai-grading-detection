@@ -125,8 +125,8 @@ def conditional_grade_with_loading(text, file, *args):
             error_msg  # system_message with error
         )
     
-    # Input is valid, proceed with normal grading
-    return grade_with_loading(text, file, *args)
+    # Input is valid, proceed with normal grading (yield from generator)
+    yield from grade_with_loading(text, file, *args)
 
 
 def build_interface():

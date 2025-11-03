@@ -32,7 +32,7 @@ def load_profiles_for_course(course_selection):
     if not course_id:
         return (
             "[Select a course first]",
-            gr.Dropdown(choices=["[Select a course first]"], value=None),
+            gr.update(choices=["[Select a course first]"], value=None),
             "[Select course to see profiles]"
         )
     
@@ -57,7 +57,7 @@ def load_profiles_for_course(course_selection):
     if not course_profiles:
         return (
             course_info,
-            gr.Dropdown(choices=["[No profiles - create one below]"], value=None),
+            gr.update(choices=["[No profiles - create one below]"], value=None),
             "No profiles yet for this course"
         )
     
@@ -70,7 +70,7 @@ def load_profiles_for_course(course_selection):
     
     return (
         course_info,
-        gr.Dropdown(choices=choices, value=None),
+        gr.update(choices=choices, value=None),
         "\n".join(profile_list)
     )
 
@@ -91,24 +91,25 @@ def create_profile(course_selection, name, instructions, criteria, fmt, score, k
     course_id = parse_course_id(course_selection)
     
     if not course_id:
-        return "❌ Please select a course first", "", "[Select a course first]", gr.Dropdown(choices=["[Select a course first]"], value=None), "[Select course to see profiles]"
+        course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
+        return "❌ Please select a course first", course_info, dropdown, profile_list
     
     if not name.strip():
         course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-        return "❌ Profile Name is required", "", course_info, dropdown, profile_list
+        return "❌ Profile Name is required", course_info, dropdown, profile_list
     
     if not instructions.strip():
         course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-        return "❌ Instructions are required", "", course_info, dropdown, profile_list
+        return "❌ Instructions are required", course_info, dropdown, profile_list
     
     if not criteria.strip():
         course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-        return "❌ Rubric is required", "", course_info, dropdown, profile_list
+        return "❌ Rubric is required", course_info, dropdown, profile_list
     
     assignment_id = db_manager.create_assignment(course_id, name, "", instructions)
     if assignment_id == -1:
         course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-        return "❌ Failed to create", "", course_info, dropdown, profile_list
+        return "❌ Failed to create", course_info, dropdown, profile_list
     
     criteria_id = db_manager.create_criteria(
         assignment_id, criteria, fmt, int(score) if score else 100, keywords, reqs
@@ -116,10 +117,10 @@ def create_profile(course_selection, name, instructions, criteria, fmt, score, k
     
     if criteria_id == -1:
         course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-        return "❌ Failed to save criteria", "", course_info, dropdown, profile_list
+        return "❌ Failed to save criteria", course_info, dropdown, profile_list
     
     course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-    return f"✅ Created profile: {name}", "", course_info, dropdown, profile_list
+    return f"✅ Created profile: {name}", course_info, dropdown, profile_list
 
 
 def load_profile_to_criteria(profile_selection):
@@ -156,16 +157,16 @@ def update_profile_action(profile_selection, name, instructions, criteria, fmt, 
     
     if not profile_id:
         course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-        return "❌ Select profile first", "", course_info, dropdown, profile_list, "", "", "letter", 100, "", ""
+        return "❌ Select profile first", course_info, dropdown, profile_list, "", "", "letter", 100, "", ""
     
     if not name.strip() or not instructions.strip() or not criteria.strip():
         course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-        return "❌ Required fields missing", "", course_info, dropdown, profile_list, instructions, criteria, fmt, score, keywords, reqs
+        return "❌ Required fields missing", course_info, dropdown, profile_list, instructions, criteria, fmt, score, keywords, reqs
     
     crit = db_manager.get_grading_criteria(profile_id)
     if not crit:
         course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-        return "❌ Profile not found", "", course_info, dropdown, profile_list, "", "", "letter", 100, "", ""
+        return "❌ Profile not found", course_info, dropdown, profile_list, "", "", "letter", 100, "", ""
     
     # Update assignment name and instructions
     course_id = parse_course_id(course_selection)
@@ -182,10 +183,9 @@ def update_profile_action(profile_selection, name, instructions, criteria, fmt, 
     
     course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
     
-    # Return 11 values: status, notification, course_info, dropdown, profile_list, + 6 form fields
+    # Return 10 values: status, course_info, dropdown, profile_list, + 6 form fields
     return (
         f"✅ Updated profile: {name}",
-        "",
         course_info,
         dropdown,
         profile_list,
@@ -205,15 +205,15 @@ def delete_profile_action(profile_selection, course_selection):
     
     if not profile_id:
         course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-        return "❌ Select profile first", "", course_info, dropdown, profile_list
+        return "❌ Select profile first", course_info, dropdown, profile_list
     
     # Delete the specific criteria (and its assignment) by criteria ID
     if db_manager.delete_criteria(profile_id):
         course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-        return "✅ Profile deleted", "", course_info, dropdown, profile_list
+        return "✅ Profile deleted", course_info, dropdown, profile_list
     
     course_info, dropdown, profile_list = load_profiles_for_course(course_selection)
-    return "❌ Delete failed", "", course_info, dropdown, profile_list
+    return "❌ Delete failed", course_info, dropdown, profile_list
 
 
 def load_profile_into_fields(profile_selection):

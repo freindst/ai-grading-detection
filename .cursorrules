@@ -58,6 +58,22 @@ After making ANY changes, you MUST update:
 9. Update README.md if user-facing
 ```
 
+### For Future Features / TODO Items:
+```
+1. Check FUTURE_PLANS.md - Is it already documented?
+2. If not, add to FUTURE_PLANS.md with detailed description
+3. DO NOT implement immediately - these are planned features, not active tasks
+4. Only implement if user explicitly instructs: "implement [feature] from FUTURE_PLANS.md"
+5. Document complexity, dependencies, and implementation approach
+```
+
+**CRITICAL RULE**: 
+- **FUTURE_PLANS.md and TODO documents are for PLANNING, not immediate implementation**
+- Features listed in FUTURE_PLANS.md should NOT be implemented unless the user explicitly requests it
+- When adding items to FUTURE_PLANS.md, mark them as "Planning Phase" and include complexity estimates
+- Only implement when user says: "implement this", "do this now", or similar explicit instruction
+- If unclear, ask user: "Would you like me to implement this now, or just document it for future?"
+
 ### For Code Changes:
 ```
 1. Read the existing file completely
@@ -334,6 +350,12 @@ Sure, I'll add that feature!
 4. Discuss approach before implementing
 5. Follow "New Features" workflow above
 
+### User Mentions a Feature from FUTURE_PLANS.md
+1. Check if user wants to implement NOW or just discuss/document
+2. If user says "implement", "do this", "add this feature" → Follow "New Features" workflow
+3. If user mentions it casually or asks "can we do X?" → Add to FUTURE_PLANS.md only, do NOT implement
+4. When in doubt, ask: "Would you like me to implement this now or add it to FUTURE_PLANS.md for later?"
+
 ## Version Control (If User Uses Git)
 
 ### Commit Messages
@@ -404,6 +426,6 @@ This prevents:
 
 ---
 
-**Last Updated**: November 2, 2025
+**Last Updated**: November 3, 2025
 **Project Version**: 1.0 (All 8 phases complete)
 
