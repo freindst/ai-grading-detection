@@ -1,0 +1,35 @@
+# Core Dependencies
+gradio>=4.0.0
+requests>=2.31.0
+
+# Document Processing
+PyPDF2>=3.0.0
+python-docx>=1.1.0
+Pillow>=10.0.0
+pytesseract>=0.3.10
+
+# Text Processing & Similarity
+sentence-transformers>=2.2.0
+scikit-learn>=1.3.0
+
+# Fine-tuning & ML
+peft>=0.7.0
+transformers>=4.35.0
+torch>=2.0.0
+accelerate>=0.24.0
+bitsandbytes>=0.41.0
+
+# Database (sqlite3 is built-in to Python)
+# sqlite3 is included in Python standard library
+
+# Search Integration
+duckduckgo-search>=4.0.0
+
+# Export & Reporting
+fpdf2>=2.7.0
+openpyxl>=3.1.0
+
+# Utilities
+python-dotenv>=1.0.0
+pyyaml>=6.0
+

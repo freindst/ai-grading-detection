@@ -1,0 +1,409 @@
+# Cursor AI Rules for Grading Assistant System
+# This file configures how AI assistants should work with this project
+
+## Project Context
+
+You are working on the **Grading Assistant System** - a complete AI-powered homework grading system using local LLMs (Ollama).
+
+- **Status**: Production ready, all 8 phases complete
+- **Language**: Python 3.10+
+- **Framework**: Gradio
+- **LLM**: Ollama (local)
+- **Location**: E:\GradingSystem (Windows) or /mnt/e/GradingSystem (WSL)
+
+## CRITICAL: Always Check These Documents FIRST
+
+Before making ANY changes, you MUST:
+
+1. **Check `CHANGELOG.md`** - See what's been done, avoid duplicates
+2. **Check `BUGS_AND_ISSUES.md`** - See if issue is already known
+3. **Check `DEVELOPMENT_LOG.md`** - See recent changes and context
+4. **Check `BUILD_PLAN.md`** - Understand the architecture
+5. **Check relevant source file** - Understand current implementation
+
+## CRITICAL: Always Update These Documents AFTER Changes
+
+After making ANY changes, you MUST update:
+
+1. **`DEVELOPMENT_LOG.md`** - Log what you changed and why
+2. **`CHANGELOG.md`** - Add to unreleased section
+3. **`BUGS_AND_ISSUES.md`** - If fixing a bug, mark it resolved
+4. **Relevant documentation** - Update README, BUILD_PLAN if needed
+
+## Mandatory Workflow
+
+### For Bug Fixes:
+```
+1. Check BUGS_AND_ISSUES.md - Is it already documented?
+2. If not, add it to BUGS_AND_ISSUES.md first
+3. Check if similar issue was fixed before (CHANGELOG.md)
+4. Fix the bug
+5. Update BUGS_AND_ISSUES.md (status: resolved)
+6. Update DEVELOPMENT_LOG.md with details
+7. Update CHANGELOG.md (Unreleased > Fixed section)
+8. Test the fix
+9. Document the fix in DEVELOPMENT_LOG.md
+```
+
+### For New Features:
+```
+1. Check BUILD_PLAN.md - Is it in scope?
+2. Check DEVELOPMENT_LOG.md - Has someone started it?
+3. Check CHANGELOG.md - Was it already added?
+4. If new, add to DEVELOPMENT_LOG.md as "In Progress"
+5. Implement the feature
+6. Update CHANGELOG.md (Unreleased > Added section)
+7. Update BUILD_PLAN.md if architecture changes
+8. Update DEVELOPMENT_LOG.md (mark complete)
+9. Update README.md if user-facing
+```
+
+### For Code Changes:
+```
+1. Read the existing file completely
+2. Check DEVELOPMENT_LOG.md for recent changes to this file
+3. Make your changes
+4. Log in DEVELOPMENT_LOG.md
+5. Update CHANGELOG.md if significant
+```
+
+## Code Style Guidelines
+
+### Python
+- Follow PEP 8
+- Use type hints where appropriate
+- Add docstrings to all functions/classes
+- Maximum line length: 100 characters
+- Use meaningful variable names
+
+### Documentation
+- Update README.md for user-facing changes
+- Update BUILD_PLAN.md for architecture changes
+- Update QUICKSTART.md for new workflows
+- Keep DEVELOPMENT_LOG.md current
+
+### Imports
+- Group imports: standard library, third-party, local
+- Sort alphabetically within groups
+- Use absolute imports for project modules
+
+### Error Handling
+- Always use try-except for external operations
+- Log errors to BUGS_AND_ISSUES.md if reproducible
+- Return meaningful error messages to users
+
+### Quality Checks After Python Edits
+- **ALWAYS run ruff check** after modifying any Python file
+- **ALWAYS run ruff format** to auto-format the code
+- **Check for indentation errors** - Python is sensitive to whitespace
+- **Verify syntax** before marking task as complete
+- If errors are found, fix them immediately before proceeding
+- Never leave Python files with syntax or indentation errors
+- **Ruff commands**:
+  - Check: `run_terminal_cmd("cd /mnt/e/GradingSystem && ruff check src/app.py")`
+  - Format: `run_terminal_cmd("cd /mnt/e/GradingSystem && ruff format src/app.py")`
+  - Check and auto-fix: `run_terminal_cmd("cd /mnt/e/GradingSystem && ruff check --fix src/app.py")`
+- Ruff is much faster than pylint and provides concise output (saves tokens)
+- Run ruff check even for small changes - indentation errors are easy to introduce
+- If terminal commands fail, fall back to `read_lints` tool
+
+#### CRITICAL: Indentation Error Prevention Strategy
+**Lesson Learned (Nov 2, 2025)**: Indentation errors CASCADE - fixing one line may expose more errors in nested blocks.
+
+**MANDATORY: When ANY indentation error occurs:**
+1. **STOP** - Do not fix the error line immediately
+2. **READ THE ENTIRE FILE** - Use `read_file` without offset/limit to see complete structure
+3. **ANALYZE SYSTEMATICALLY** - Identify ALL indentation errors at once
+4. **FIX COMPREHENSIVELY** - Make all fixes in one or two edits, not one-at-a-time
+5. **VERIFY ONCE** - Run `read_lints` after all fixes are complete
+
+**Why This Approach Works:**
+- Reactive fixing (one error at a time) leads to 5-10 iterations of fix → error → fix → error
+- Systematic fixing (read entire file first) leads to 1-2 iterations of analyze → fix → done
+- Reading full context reveals patterns and related issues that partial reads miss
+
+**Step-by-Step Process for Indentation Errors:**
+
+**Step 1: READ ENTIRE FILE**
+```python
+read_file(target_file="src/app.py")  # NO offset, NO limit - read ALL lines
+```
+
+**Step 2: VISUAL ANALYSIS**
+- Scan for all `with` statements in the problem area
+- Check indentation levels of each `with` statement
+- Verify each `with` is indented inside its parent context
+- Look for patterns: multiple errors usually cluster together
+
+**Step 3: IDENTIFY ALL ERRORS**
+- Mark every line with incorrect indentation
+- Note the correct indentation level for each
+- Group related errors (same block structure)
+
+**Step 4: FIX ALL AT ONCE**
+- Use search_replace to fix entire blocks, not individual lines
+- Make 1-3 comprehensive edits instead of 10+ small edits
+- Fix groups of related errors together
+
+**Step 5: VERIFY**
+```python
+read_lints(paths=["src/app.py"])
+```
+- Should show ZERO errors
+- If errors remain, repeat from Step 1
+
+**Common Indentation Patterns in Gradio UI (src/app.py):**
+```python
+# Correct nesting example:
+with gr.Row():                    # Level N
+    with gr.Column():             # Level N+1 (inside Row)
+        with gr.Accordion():      # Level N+2 (inside Column)
+            textbox = gr.Textbox()  # Level N+3 (inside Accordion)
+```
+
+**Red Flags to Watch For:**
+- Two consecutive `with` statements at the same indentation level (usually one should be nested)
+- `with` statement followed immediately by another `with` without indentation change
+- Mixing 3, 4, 5 indentation levels in same block (inconsistency signal)
+- Error message: "expected an indented block after 'with' statement" = next line needs MORE indentation
+- Error message: "unindent does not match any outer indentation level" = line is breaking out of proper nesting
+
+**Example of Correct Systematic Fix:**
+```
+1. User reports: IndentationError at line 318
+2. AI: read_file("src/app.py")  # Read ALL 676 lines
+3. AI: Identifies errors at lines 318, 346, 363, 385, 391, 415, 452
+4. AI: Fixes all 7 errors in 2 comprehensive search_replace operations
+5. AI: read_lints(paths=["src/app.py"])  # Result: 0 errors ✅
+6. DONE in 5 steps instead of 30+
+```
+
+**Verification Checklist:**
+- [ ] Read entire file without offset/limit
+- [ ] Identified ALL indentation errors in one analysis
+- [ ] Fixed all errors in 1-3 comprehensive edits (not 10+ small edits)
+- [ ] Ran `read_lints` and got zero errors
+- [ ] Visually inspected the entire `with` block structure
+- [ ] Confirmed each `with` is indented inside its parent context
+- [ ] No mixing of indentation levels (all use 4 spaces consistently)
+
+## Project Structure Understanding
+
+### Source Code (src/)
+- `app.py` - Main Gradio UI (775+ lines) - DO NOT modify lightly
+- `llm_client.py` - Ollama integration
+- `grading_engine.py` - Core grading logic
+- 14 other modules - See BUILD_PLAN.md
+
+### Documentation (root/)
+- `README.md` - User documentation
+- `BUILD_PLAN.md` - Architecture & implementation
+- `CHANGELOG.md` - All changes
+- `DEVELOPMENT_LOG.md` - Ongoing work
+- `BUGS_AND_ISSUES.md` - Known issues
+
+### Configuration
+- `.cursorignore` - What Cursor ignores
+- `.gitignore` - What Git ignores
+- `requirements.txt` - Python dependencies
+
+## Testing Requirements
+
+When making changes:
+1. Manual testing is required (no automated tests yet)
+2. Document test cases in DEVELOPMENT_LOG.md
+3. Test with at least one example
+4. Verify no new linter errors: Check with IDE
+5. Document any breaking changes
+
+## Dependencies
+
+### Adding New Dependencies
+1. Check if really needed (avoid bloat)
+2. Add to `requirements.txt`
+3. Document in CHANGELOG.md
+4. Update INSTALL*.md files if setup changes
+5. Test installation in clean venv
+
+### Updating Dependencies
+1. Test thoroughly after update
+2. Document in CHANGELOG.md
+3. Check for breaking changes
+4. Update version pins if needed
+
+## Common Patterns
+
+### Adding a New Feature to UI
+1. Check `app.py` current structure
+2. Add to appropriate tab (Text/File/Batch)
+3. Create callback function
+4. Wire up with `.click()` or `.change()`
+5. Update QUICKSTART.md with usage example
+
+### Adding a New Module
+1. Create in `src/` directory
+2. Follow existing module pattern
+3. Add to `BUILD_PLAN.md` file list
+4. Import in `app.py` if needed
+5. Add docstring explaining purpose
+
+### Modifying Database Schema
+1. **CAREFUL** - This can break existing databases
+2. Document in DEVELOPMENT_LOG.md first
+3. Consider migration script
+4. Test with empty and populated database
+5. Update `BUILD_PLAN.md` schema documentation
+
+## User Setup Context
+
+- **OS**: Windows 11
+- **Python**: Not yet installed (planned)
+- **Ollama**: Installed (v0.12.9)
+- **WSL**: Ubuntu-22.04 available
+- **Recommended**: Use WSL for installation
+
+## File Locations
+
+### WSL Paths:
+```
+Project: /mnt/e/GradingSystem
+Docs: /mnt/e/GradingSystem/*.md
+Source: /mnt/e/GradingSystem/src/
+```
+
+### Windows Paths:
+```
+Project: E:\GradingSystem
+Docs: E:\GradingSystem\*.md
+Source: E:\GradingSystem\src\
+```
+
+## Communication Style
+
+When responding to user:
+- Be concise and clear
+- Show code examples when helpful
+- Cite specific files and line numbers
+- Mention if checking CHANGELOG or DEVELOPMENT_LOG
+- Always update logs after changes
+- Explain WHY, not just WHAT
+
+## Examples
+
+### Good Response Pattern:
+```
+I checked DEVELOPMENT_LOG.md and this hasn't been attempted yet.
+Looking at src/grading_engine.py lines 45-67...
+
+[make changes]
+
+I've updated:
+- src/grading_engine.py (added new feature)
+- DEVELOPMENT_LOG.md (logged the change)
+- CHANGELOG.md (added to Unreleased > Added)
+```
+
+### Bad Response Pattern:
+```
+Sure, I'll add that feature!
+
+[makes changes without checking logs]
+[doesn't update any documentation]
+```
+
+## Special Cases
+
+### User Reports a Bug
+1. Add to BUGS_AND_ISSUES.md immediately
+2. Attempt to reproduce
+3. Check if related to known issues
+4. Fix if possible
+5. Update BUGS_AND_ISSUES.md with resolution
+6. Log in DEVELOPMENT_LOG.md
+
+### User Asks "What's been done?"
+1. Refer to CHANGELOG.md for complete history
+2. Refer to BUILD_PLAN.md for architecture
+3. Refer to DEVELOPMENT_LOG.md for recent work
+4. Cite specific entries
+
+### User Wants to Add Feature
+1. Check if in BUILD_PLAN.md scope
+2. Check if already exists (grep source code)
+3. Check DEVELOPMENT_LOG.md if someone started it
+4. Discuss approach before implementing
+5. Follow "New Features" workflow above
+
+## Version Control (If User Uses Git)
+
+### Commit Messages
+- Use conventional commits: `feat:`, `fix:`, `docs:`, etc.
+- Reference CHANGELOG.md entry
+- Keep under 72 characters
+
+### Before Committing
+- Update CHANGELOG.md
+- Update DEVELOPMENT_LOG.md
+- Check no debug code left
+- Verify .gitignore works
+
+## Performance Considerations
+
+- Batch processing uses ThreadPoolExecutor (max 3 workers)
+- Large files (>10MB) may be slow
+- Database queries should be fast (<100ms)
+- UI should be responsive (use gr.Progress for long operations)
+
+## Security Notes
+
+- Never commit `.env` files
+- Database contains user data - keep local
+- Ollama runs locally - no external API calls
+- Student submissions are temporary (in data/uploads/)
+
+## Maintenance
+
+### Regular Checks
+- Review BUGS_AND_ISSUES.md weekly
+- Clean up DEVELOPMENT_LOG.md monthly (archive old entries)
+- Update BUILD_PLAN.md when architecture changes
+- Keep CHANGELOG.md organized by version
+
+### When Starting New Work
+- Review recent DEVELOPMENT_LOG.md entries
+- Check BUGS_AND_ISSUES.md for priorities
+- Read relevant BUILD_PLAN.md sections
+- Understand current state before changing
+
+## Emergency Procedures
+
+### If System Breaks
+1. Document in BUGS_AND_ISSUES.md (severity: critical)
+2. Check recent DEVELOPMENT_LOG.md entries
+3. Check CHANGELOG.md for recent changes
+4. Attempt rollback if possible
+5. Fix and document thoroughly
+
+### If Database Corrupted
+1. User's data - suggest backup
+2. Can regenerate with: `rm data/database.db` (fresh start)
+3. Document in BUGS_AND_ISSUES.md
+4. Add migration if schema issue
+
+## Remember
+
+🔴 **ALWAYS check documentation BEFORE making changes**
+🟡 **ALWAYS update documentation AFTER making changes**
+🟢 **ALWAYS test your changes**
+
+This prevents:
+- Duplicate work
+- Breaking existing features
+- Losing track of changes
+- Confusion about project state
+
+---
+
+**Last Updated**: November 2, 2025
+**Project Version**: 1.0 (All 8 phases complete)
+

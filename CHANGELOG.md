@@ -1,0 +1,460 @@
+# Changelog
+
+All notable changes to the Grading Assistant System will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [Unreleased]
+
+### Added
+- **Input Validation**: Grade button now validates input before processing
+  - Checks if text or file is provided before grading
+  - Shows clear error message: "⚠️ No input provided. Please paste text or upload a file before grading."
+  - Stays on Input tab instead of switching to Output when validation fails
+  - Prevents wasted LLM calls on empty input
+- **Robust AI Disclosure Analysis**: Comprehensive error handling for AI disclosure checks
+  - Multi-strategy JSON parsing (markdown blocks, balanced braces, greedy fallback)
+  - Empty response detection with informative messages
+  - Default field values for missing data
+  - Category-specific error messages (JSON parse, empty response, LLM failure)
+  - Detailed troubleshooting suggestions in UI
+  - Clear reminder that grading continues even if disclosure check fails
+- **Smart Field Extraction**: Parser now intelligently extracts missing fields
+  - Automatically detects and extracts student_feedback from detailed_feedback when LLM combines them
+  - Recognizes patterns: "Student Feedback:", "Feedback for student:", etc.
+  - Removes extracted student feedback from detailed_feedback to avoid duplication
+  - Philosophy: "Parse as much as you can" - graceful degradation over strict validation
+  - Works even when LLM doesn't follow exact JSON structure
+- **Ollama Connection Health Check**: App now verifies Ollama connectivity on startup
+
+### Changed
+- **LLM Feedback Style**: Instructed LLM to avoid generic praise and be more direct
+  - No more "Good job", "Great work", "Keep up the good work", "Well done"
+  - Focus on specific, actionable feedback with examples
+  - Professional but straightforward - no unnecessary compromises or sugar-coating
+  - Explains WHY something is good rather than just saying it is
+- **UI Simplified**: Removed "Clear Text" button - only "Clear All" button remains (clears both text and file)
+
+### Fixed
+- **JSON Parsing Failure**: Fixed grading output displaying raw JSON instead of parsed fields
+  - Implemented multi-strategy JSON parsing with 3 fallback methods
+  - Strategy 1: Extract from markdown code blocks (```json ... ```)
+  - Strategy 2: Balanced brace matching for robust JSON extraction
+  - Strategy 3: Greedy regex as last resort
+  - Added debug logging for each parsing attempt
+  - Extracted helper method `_build_parsed_result()` for cleaner code
+  - Now correctly extracts grade, detailed_feedback, and student_feedback
+  - Handles JSON with surrounding text or formatting issues
+- **AI Disclosure Analysis TypeError**: Fixed crash when LLM returns incomplete or invalid JSON
+  - Added null-safety checks for `disclosure_statement` and `evidence` fields
+  - Safe string slicing prevents `NoneType` subscriptable errors
+  - Improved error messages: "LLM returned invalid response" instead of raw JSON errors
+  - Graceful handling of all AI disclosure edge cases
+  - No more crashes when AI disclosure analysis fails
+- **Submission Preview Display**: Shows filename and first 5 lines at top of Output tab
+  - Displays immediately when grading starts, before LLM processing
+  - Shows filename (or "Direct Text Submission" for pasted text)
+  - Shows total character count and line count
+  - Shows first 5 lines of submission (truncates long lines >100 chars)
+  - Helps instructors identify which student's work is being graded
+  - Provides quick context without switching tabs
+  - Added collapsible accordion for preview in Output tab
+- **Auto-Switch to Output Tab**: Automatically switches to Output tab when grading starts
+  - User clicks "Grade" → UI immediately switches to Output tab → Shows "Processing..." → Displays results
+  - Eliminates manual tab switching step
+  - Provides immediate visual feedback for better UX
+  - Uses Gradio's chained event handlers for seamless transition
+- **Database Migration System**: Automatic schema migration for existing databases
+  - Added `_migrate_criteria_text_to_rubric()` method to `DatabaseManager`
+  - Automatically detects and migrates old `criteria_text` column to `rubric`
+  - Runs on every app startup with clear status messages
+  - Preserves all existing user data during migration
+  - Handles edge cases: old schema, new schema, partial migration, corrupted schema
+  - Non-blocking: app continues even if migration encounters issues
+- **Modular Architecture**: Restructured entire codebase for better maintainability
+  - Created new `src/ui/` module with clean separation of concerns
+  - `src/ui/course_handlers.py`: All course CRUD operations (5 functions, 90 lines)
+  - `src/ui/profile_handlers.py`: All profile CRUD operations (7 functions, 273 lines)
+  - `src/ui/grading_handlers.py`: All grading and feedback operations (14 functions, 575 lines)
+  - Main `src/app.py` reduced from 1422 lines to 613 lines
+  - NO breaking changes - all existing functionality preserved
+  - Each module is now self-contained and easier to test/debug
+  - Eliminates cascading indentation errors that plagued the monolithic file
+
+### Changed
+- **Clear Button Layout**: Reorganized Input tab for better UX
+  - Moved both "Clear Text" and "Clear All" buttons under file uploader column
+  - Removed clear button from under text submission area
+  - Creates a more logical grouping with action buttons in one location
+  - Cleaner, more intuitive interface layout
+- **Model Selection Logic**: Now dynamically loads only installed Ollama models
+  - Removed hardcoded fallback list of 5 models (qwen2.5-coder, llama3.1, mistral, qwen2.5, deepseek-r1)
+  - Model dropdown now shows ONLY models actually installed in your Ollama instance
+  - Added helpful error message "⚠️ No models found - Check Ollama" if Ollama unreachable
+  - Added 3-second timeout to prevent UI hanging during Ollama connection attempts
+  - Better error handling with specific connection failure messages
+  - Auto-selects first available model as default
+- **Tab Scrolling Behavior**: Removed sticky positioning for simpler, more reliable UX
+  - Removed `position: sticky` from system messages and tab navigation bars
+  - Removed `overflow-y: auto` and `max-height` constraints on tab content
+  - Removed `z-index` stacking complexity
+  - Simplified CSS from 44 lines to 31 lines (13 lines removed)
+  - Result: Normal scroll flow that works consistently across all content heights
+  - No more floating/sticky elements that caused layout issues
+- **Tab Visual Styling**: Normalized all tab components for consistent appearance
+  - All tabs now have identical button sizes (100px min-width, 44px height)
+  - Consistent padding (10px 16px) and margins (2px) for all tab buttons
+  - Unified container styling with normalized margins and padding
+  - Both left panel (Courses/Profiles) and right panel (Input/Output/Batch/Feedback) tabs now match visually
+  - Fixed inconsistencies caused by different tab counts and hierarchies
+  - Added border-radius (4px) for polished button appearance
+- **AI Detection Prompt System**: Redesigned for silent, professional keyword detection
+  - Restructured system prompt with explicit "Do NOT mention keywords in feedback" instructions
+  - Changed "AI Detection Keywords" to "SILENT KEYWORD DETECTION (Internal Use Only)"
+  - Added 3 critical reminders throughout prompt to prevent keyword leakage
+  - Keywords now only appear in `ai_detection_keywords` JSON field, never in student-facing feedback
+  - Student feedback remains professional and focused on work quality
+  - Preserves academic integrity by not alerting students to detection
+- **Output Tab Layout**: Reorganized into 2-column layout for better workflow
+  - Left column (scale=3): Grading Results (grade, AI detection, feedback, context, debug)
+  - Right column (scale=2): Human Correction & Feedback for easy side-by-side comparison
+  - Improves efficiency when reviewing and correcting AI grading
+- **Font Sizes Reduced**: Global font size reduction for more condensed UI
+  - Base font: 12px → 11px
+  - H1: 20px → 18px
+  - H3: 13px → 12px
+  - Entire interface now more compact and fits more information on screen
+- **Database Schema Consistency**: Renamed `criteria_text` field to `rubric` throughout entire codebase
+  - Updated database.py: CREATE TABLE, create_criteria(), update_criteria()
+  - Updated app.py: load_profile_into_fields()
+  - Updated profile_manager.py: create_assignment_profile(), duplicate_assignment(), export_profile(), import_profile()
+  - Provides more intuitive and user-friendly field naming
+
+### Fixed
+- **CRITICAL: AI Detection Text Leaking into detailed_feedback (Second Fix)**
+  - **Problem**: LLM was including "AI Detection Keywords: []" as literal text inside the `detailed_feedback` field
+  - **Root Cause**: Previous fix prevented keyword mentions but not the "AI Detection Keywords:" label text itself
+  - **Solution**: Enhanced prompts in `src/grading_engine.py` with explicit instructions
+  - Added 3 new system prompt instructions: "do NOT write 'AI Detection Keywords:' as text", "NEVER include phrases like 'AI Detection Keywords: []'", "data goes ONLY in JSON array field"
+  - Added 7 JSON format reminders in user prompt explicitly forbidding text labels
+  - **Result**: The `ai_detection_keywords` array is now completely separate from feedback text
+- **CRITICAL: AI Detection Keywords Leaking into Student Feedback**
+  - **Problem**: Keywords like "histocompatibility" were appearing in student feedback (e.g., "I appreciate the use of 'histocompatibility'..."), alerting students they were flagged
+  - **Root Cause**: Old prompt explicitly told LLM about keywords, making it treat them as grading criteria
+  - **Solution**: Redesigned prompts with "SILENT KEYWORD DETECTION" section and multiple "Do NOT mention" instructions
+  - **Result**: Keywords now only appear in instructor's `ai_detection_keywords` field, never in student-facing text
+  - **Impact**: Preserves academic integrity by not alerting students to detection
+- **"No such column: rubric" Error**: Fixed database schema mismatch causing profile update failures
+  - Root cause: Code was updated to use `rubric` but existing databases still had `criteria_text` column
+  - Solution: Added automatic migration that renames column on first startup
+  - Users with existing databases will see migration message and data is preserved
+  - New installations work correctly with `rubric` column from the start
+- **Critical Rubric Bug**: Fixed profile rubric field not loading or saving correctly
+  - Root cause: `load_profile_to_criteria()` was using wrong database field name (`criteria_text` instead of `rubric`)
+  - Changed to `criteria.get('rubric', '')` in `src/ui/profile_handlers.py`
+  - Rubric now loads and saves correctly when selecting/updating profiles
+  - This was preventing users from viewing or editing grading criteria
+- **Profile Auto-Load Event**: Fixed profile dropdown not loading rubric and other fields
+  - Changed from `.change()` to `.select()` event handler
+  - `.select()` fires specifically on user selection, not programmatic updates
+  - Ensures reliable loading of all form fields when a profile is selected
+- **Grade Parsing Logic**: Fixed issue where valid grades (like "85") were showing as "N/A"
+  - Changed logic to only trigger LLM fallback parsing when grade is actually missing
+  - Previously would re-parse valid JSON if "Use LLM Parse" checkbox was checked
+  - Now preserves valid grades from initial JSON parse
+- **Profile Update UI Refresh**: Fixed issue where form fields (especially rubric) didn't refresh after clicking update button
+  - Modified `update_profile_action()` to return updated form field values after database update
+  - Updated event handler to refresh all 6 form fields (instructions, rubric, format, score, keywords, requirements)
+  - Users now see their changes immediately reflected in the UI
+- **Profile Loading Error**: Fixed `KeyError: 'rubric'` when selecting a profile from dropdown
+- **Multiple Indentation Errors**: Corrected inconsistent indentation in app.py that prevented startup (lines 943, 1042-1054, 1058-1059, 1088, 1097, 1107, 1112, 1134, 1151-1157)
+
+### Removed
+- **Redundant Load Profile Button**: Removed separate "Load Profile" button
+  - Profile dropdown now auto-loads on selection via existing `.change()` event
+  - Simplifies UI and reduces user clicks
+  - Delete button is now standalone for clarity
+
+### Added
+- **Few-Shot In-Context Learning**: System now uses saved "good examples" to guide LLM grading
+  - New `select_few_shot_examples()` function that selects up to N good examples
+  - Examples formatted with grade, reasoning, and effectiveness notes
+  - Integrated into grading prompt before submission
+- **Few-Shot UI Controls**: New settings in grading section
+  - Checkbox: "Enable few-shot learning" (default: ON)
+  - Slider: Choose 0-5 examples to use (default: 2)
+  - Visual feedback when examples are being used
+- **FUTURE_PLANS.md**: Comprehensive roadmap for intelligent example selection
+  - Embedding-based similarity search
+  - Performance tracking per example
+  - Adaptive user preference learning
+  - Category/assignment-type matching
+- **Enhanced Feedback Table Styling**: Dramatically improved readability
+  - White background with dark text (#000000)
+  - Blue headers (#0066ff) with white text
+  - Alternating row colors with hover effects
+  - Clear borders and padding
+- **Improved AI Detection Messages**: More explicit and user-friendly
+  - "🚨 AI KEYWORDS DETECTED" with full explanation when keywords found
+  - "✅ NO AI KEYWORDS DETECTED" with reassurance when clean
+  - Clear visibility in dedicated output field
+- **Prompt & Feedback Tab**: New "🔍 Prompt & Feedback" tab to view LLM prompts and provide feedback
+  - Display system prompt (LLM instructions)
+  - Display user prompt (submission + criteria)
+  - Feedback text area for user criticism
+  - "Mark as good example" checkbox for in-context learning
+  - Saves feedback to `data/feedback/` as JSON files
+- **Tree Structure View**: Hierarchical display showing courses with their profiles
+  - Visual tree showing Course → Profile relationships
+  - Clear ID display for easy selection: [ID:123]
+  - Shows orphan profiles (not assigned to any course)
+- **Create/Edit Toggle**: Mode switch for course and profile management
+  - Radio button to toggle between Create and Edit modes
+  - Edit mode shows selection field + delete button
+  - Cleaner workflow with single form for both operations
+- **Smaller Font Sizes**: Condensed UI (12-13px) for better content density
+- **Enhanced Dropdown Contrast**: CSS-based fixes for visibility
+  - Dropdown text: #f0f0f0 on #1a1a1a background
+  - Hover states: #333333 background
+  - Clear borders and focus states
+- **Profile-Course Connection**: Profiles now properly linked to courses in tree
+- `.cursorrules`, `CHANGELOG.md`, `BUGS_AND_ISSUES.md`, `DEVELOPMENT_LOG.md`
+- `.cursorignore`, `.gitignore`, `IGNORE_FILES_GUIDE.md`
+- `configure_ollama.sh`, `INSTALLATION_COMPLETE.md`, `.env`
+
+### Fixed
+- **Feedback table selection error**: Fixed `NoneType' object has no attribute 'value` error
+  - Replaced broken lambda with proper `handle_table_select()` function
+  - Uses Gradio's SelectData event with proper index handling
+  - Now correctly extracts filename from selected row
+- **Feedback table readability**: Fixed similar text/background colors
+  - Applied comprehensive CSS overrides for dataframe
+  - Dark text on white background for maximum contrast
+  - Blue headers with white text for clear visual hierarchy
+- **AI detection output clarity**: More explicit messaging
+  - Before: "✅ No AI keywords detected" (minimal)
+  - After: "✅ NO AI KEYWORDS DETECTED\n\nNo suspicious AI-related phrases found in submission."
+  - Clear warnings when keywords ARE detected with full context
+- **Numeric grading format** - LLM now correctly returns numeric scores (0-100) instead of letter grades when profile uses numeric format (emphatic prompt rewrite)
+- **Profile update error** - Fixed `AttributeError: create_grading_criteria method not found` (corrected to `create_criteria`)
+- **Radio button/checkbox visibility** - Completely redesigned CSS with:
+  - Clear selected states using `:has()` pseudo-class
+  - Blue border (#0066ff) with glow effect for selected items
+  - Blue-tinted background (#1a3a5a) for selected state
+  - Larger 20px inputs with better contrast
+  - Smooth hover transitions
+
+### Changed
+- **src/grading_engine.py**: Added `few_shot_examples` parameter to `build_grading_prompt()` and `grade_submission()`
+  - Examples are injected into prompt before student submission
+  - Formatted with clear markdown for LLM consumption
+- **src/app.py**: Major updates for few-shot learning and bug fixes
+  - Added `select_few_shot_examples()` function (random/recent selection from good examples)
+  - Added `handle_table_select()` function (proper Gradio SelectData handling)
+  - Updated `grade_submission()` to accept and use `use_few_shot` and `num_examples` parameters
+  - Updated `grade_with_loading()` wrapper to pass through few-shot parameters
+  - Enhanced AI detection messages in output formatting
+  - Added comprehensive CSS for dataframe/table styling
+- **Grading UI**: New few-shot controls added between Temperature and AI Detection sections
+- **Event handlers**: Updated `grade_btn.click()` and `feedback_table.select()` with new parameters
+- **Prompt builder enhanced** - Added explicit format instructions with examples for numeric vs letter grading
+- **Grade submission function** - Now returns system and user prompts for display
+- **Complete UI Redesign**: Tree-based management (~650 lines)
+- **src/app.py**: Tree view with create/edit toggles
+  - Left: Tree view + Course/Profile tabs with mode toggles
+  - Right: Input/Output/Batch tabs
+  - Font sizes reduced to 12-13px
+  - All heights optimized for single-page view
+- **src/database.py**: Added `update_assignment()` method
+- **Management Workflow**: Select from tree, toggle to Edit mode, modify
+- `requirements.txt` - Removed sqlite3 (built-in to Python)
+- `src/llm_client.py` - Added dotenv support
+- `start_wsl.sh` - Updated launcher
+
+### Fixed
+- Installation error with sqlite3 dependency
+- Ollama WSL connectivity (Windows host IP auto-detection)
+- Missing `get_all_criteria` method
+- Course and profile not properly connected - now shows hierarchy
+- Dropdown text invisible - fixed with CSS overrides
+- Font too large - reduced to 12-13px
+- UI too tall - now fits one page
+
+### Removed
+- None
+
+---
+
+## [1.0.0] - 2025-11-02
+
+### Added
+
+#### Phase 1: Core Infrastructure
+- `src/llm_client.py` - Ollama client with model management
+- `src/grading_engine.py` - Core grading logic and prompt building
+- `src/app.py` - Main Gradio UI (775+ lines)
+- Support for multiple LLM models (qwen2.5-coder, llama3.1, mistral, etc.)
+- Context management (clear/continue modes)
+- Dual feedback system (detailed for instructor, concise for student)
+- Raw and formatted input/output display
+- JSON, regex, and LLM-based output parsing
+- AI keyword detection system
+- Connection status checking
+
+#### Phase 2: File Upload & Batch Processing
+- `src/document_parser.py` - Multi-format document parser
+- `src/batch_processor.py` - Concurrent batch processing
+- PDF parsing support (PyPDF2)
+- DOCX/DOC parsing support (python-docx)
+- Plain text parsing with multiple encoding support
+- Image OCR support (pytesseract + Pillow)
+- ThreadPoolExecutor for concurrent grading (max 3 workers)
+- Progress tracking with callback system
+- Results table display
+- CSV and JSON export
+
+#### Phase 3: Plagiarism Detection
+- `src/plagiarism_checker.py` - Text similarity detection
+- Pairwise comparison using SequenceMatcher
+- Suspicion level classification (high/medium/low/none)
+- Configurable similarity thresholds (80%/60%/40%)
+- Batch plagiarism checking
+- Human-readable plagiarism reports
+- Integration with batch processor
+
+#### Phase 4: Profile & Prompt Management
+- `src/database.py` - SQLite database operations
+- `src/profile_manager.py` - Course and assignment management
+- `src/prompt_builder.py` - Template system
+- 6 normalized database tables (courses, assignments, criteria, templates, history)
+- Complete CRUD operations for courses and assignments
+- Grading criteria storage and management
+- Prompt template system with variable substitution
+- Template inheritance and duplication
+- Profile export/import functionality
+- Grading history tracking
+- Good example marking for training
+
+#### Phase 5: Advanced Parsing & Feedback
+- `src/criteria_parser.py` - Multi-format criteria parser
+- `src/output_parser.py` - Multi-strategy output parser
+- `src/feedback_collector.py` - Human feedback collection
+- Auto-format detection (JSON, YAML, bullets, plain text)
+- Natural language conversion for criteria
+- Three-strategy parsing (JSON → regex → LLM)
+- Confidence scoring for parsed results
+- Human feedback collection interface
+- Training data preparation
+- Feedback dataset export (JSONL/JSON)
+
+#### Phase 6: In-Context Learning
+- `src/few_shot_manager.py` - Few-shot learning management
+- Example quality evaluation system (0-100 scoring)
+- Multiple selection strategies (best, diverse, recent)
+- Few-shot prompt building (structured/conversational)
+- System and user prompt augmentation
+- Example recommendation system
+- Foundation for LoRA/QLoRA fine-tuning (PEFT library)
+
+#### Phase 7: Internet Search & Reference Verification
+- `src/web_search.py` - Web search integration
+- `src/reference_verifier.py` - Citation verification
+- DuckDuckGo search API integration
+- URL extraction from submissions
+- Citation pattern extraction (Author, Year), [1], etc.
+- Reference verification with confidence scoring
+- Verification report generation
+- Reference improvement suggestions
+
+#### Phase 8: Export & Reporting
+- `src/export_manager.py` - Multi-format export
+- `src/report_generator.py` - Comprehensive report generation
+- CSV export (full/summary options)
+- JSON export (pretty/compact)
+- Excel export with formatting (openpyxl)
+- PDF report generation (fpdf2)
+- HTML report generation (styled, interactive)
+- Summary statistics export
+- Grade distribution visualization
+- Plagiarism summaries in reports
+- Timestamped filenames
+
+#### Documentation
+- `README.md` - Comprehensive user documentation
+- `QUICKSTART.md` - Quick start guide with examples
+- `INSTALL.md` - Complete installation guide
+- `INSTALL_WSL.md` - WSL-specific installation guide
+- `IMPLEMENTATION_SUMMARY.md` - Technical summary
+- `BUILD_PLAN.md` - Complete architecture documentation
+- `QUICK_REFERENCE.md` - Quick command reference
+
+#### Installation Scripts
+- `install.ps1` - Windows PowerShell installer (venv)
+- `install.sh` - Linux/Mac installer (venv)
+- `install_conda.ps1` - Windows Conda installer
+- `install_wsl.sh` - WSL Ubuntu/Debian installer
+- `start_wsl.sh` - WSL quick launcher script
+
+#### Configuration
+- `requirements.txt` - Python dependencies (20+ packages)
+- Project directory structure (data/, exports/, models/, prompts/)
+- `.gitkeep` files for empty directory preservation
+
+### Features
+
+- **3-Tab Interface**: Text Input, File Upload, Batch Grading
+- **5 Output Views**: Formatted, Detailed, Student, Raw, Input
+- **7 File Formats**: PDF, DOCX, DOC, TXT, PNG, JPG, JPEG
+- **5 Export Formats**: CSV, JSON, Excel, PDF, HTML
+- **5+ LLM Models**: Any Ollama-compatible model
+- **Concurrent Processing**: Up to 3 submissions simultaneously
+- **Database-Backed**: SQLite with 6 normalized tables
+- **Privacy-First**: Local LLM execution, no cloud dependencies
+- **Cross-Platform**: Windows, Linux, macOS, WSL
+
+### Technical Details
+
+- **Total Files**: 17 Python modules, 7 documentation files, 5 installation scripts
+- **Lines of Code**: ~5,000+ (excluding dependencies)
+- **Python Version**: 3.10+ (tested with 3.11)
+- **UI Framework**: Gradio 4.0+
+- **LLM Backend**: Ollama
+- **Database**: SQLite3
+- **Testing**: Manual testing completed for all features
+
+---
+
+## Version History
+
+- **1.0.0** (2025-11-02) - Initial release, all 8 phases complete
+- **Unreleased** - Current development version
+
+---
+
+## Change Categories
+
+- **Added**: New features
+- **Changed**: Changes to existing functionality
+- **Deprecated**: Soon-to-be removed features
+- **Removed**: Removed features
+- **Fixed**: Bug fixes
+- **Security**: Security fixes
+
+---
+
+## How to Use This Changelog
+
+1. **Before making changes**: Check if similar change was already made
+2. **After making changes**: Add entry to [Unreleased] section
+3. **When releasing**: Move [Unreleased] entries to new version section
+4. **Always**: Keep changes organized by category
+5. **Be specific**: Include file names and brief description
+
+---
+
+**Maintained By**: AI Assistant (with user oversight)
+**Last Updated**: November 2, 2025
+
