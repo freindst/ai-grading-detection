@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - No user-facing impact (feature was never visible)
 
 ### Changed
+- **Responsive Design**: Implemented adaptive scaling for ultrawide and Full HD displays
+  - CSS custom properties with media queries for automatic size adjustment
+  - 3440x1440 (Ultrawide): Larger fonts (14px base), spacious buttons and inputs
+  - 1920x1080 (Full HD): Medium fonts (13px base), balanced layout
+  - < 1920px: Compact fonts (12px base), optimized for smaller screens
+  - All UI elements scale proportionally: text, buttons, inputs, spacing, checkboxes
+  - No manual zoom required - optimal readability at native resolution
+  - Smooth transitions between breakpoints for consistent experience
 - **Input Order**: File submission now appears before text submission in all views
   - Classic View: File upload (left column) → Text submission (right column)
   - Split View: File upload → Text submission (vertical order)

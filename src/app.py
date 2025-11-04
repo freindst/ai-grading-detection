@@ -208,17 +208,62 @@ def build_interface():
         input_placeholder_color="#808080",
     )
     
-    # Custom CSS for better contrast and styling
+    # Custom CSS for better contrast and styling with responsive design
     custom_css = """
-        .gradio-container {max-width: 100% !important; padding: 6px !important;}
+        /* Base responsive sizing for ultrawide displays (3440x1440) */
+        :root {
+            --base-font-size: 14px;
+            --heading-1-size: 24px;
+            --heading-3-size: 16px;
+            --button-font-size: 14px;
+            --spacing-sm: 8px;
+            --spacing-md: 12px;
+            --spacing-lg: 16px;
+            --button-padding: 10px 16px;
+            --input-padding: 10px 12px;
+        }
+        
+        /* Adapt to Full HD (1920x1080) - slightly smaller */
+        @media (max-width: 2560px) and (min-width: 1920px) {
+            :root {
+                --base-font-size: 13px;
+                --heading-1-size: 22px;
+                --heading-3-size: 15px;
+                --button-font-size: 13px;
+                --spacing-sm: 6px;
+                --spacing-md: 10px;
+                --spacing-lg: 14px;
+                --button-padding: 8px 14px;
+                --input-padding: 8px 10px;
+            }
+        }
+        
+        /* Smaller displays (< 1920px) */
+        @media (max-width: 1919px) {
+            :root {
+                --base-font-size: 12px;
+                --heading-1-size: 20px;
+                --heading-3-size: 14px;
+                --button-font-size: 12px;
+                --spacing-sm: 6px;
+                --spacing-md: 8px;
+                --spacing-lg: 12px;
+                --button-padding: 6px 12px;
+                --input-padding: 6px 10px;
+            }
+        }
+        
+        .gradio-container {max-width: 100% !important; padding: var(--spacing-sm) !important;}
         .contain {max-height: calc(100vh - 80px) !important; overflow-y: auto !important;}
-        * {font-size: 11px !important;}
-        h1 {font-size: 18px !important; margin: 8px 0 !important;}
-        h3 {font-size: 12px !important; margin: 6px 0 !important;}
+        * {font-size: var(--base-font-size) !important;}
+        h1 {font-size: var(--heading-1-size) !important; margin: var(--spacing-md) 0 !important;}
+        h3 {font-size: var(--heading-3-size) !important; margin: var(--spacing-sm) 0 !important;}
         textarea, input, select {
             color: #f0f0f0 !important; 
             background: #1a1a1a !important; 
             border: 1px solid #606060 !important;
+            padding: var(--input-padding) !important;
+            font-size: var(--base-font-size) !important;
         }
         textarea:focus, input:focus, select:focus {
             background: #252525 !important; 
@@ -226,7 +271,11 @@ def build_interface():
         }
         h1 {color: #f0f0f0 !important;}
         h3 {color: #e0e0e0 !important;}
-        label {color: #e0e0e0 !important; font-weight: 600 !important;}
+        label {
+            color: #e0e0e0 !important; 
+            font-weight: 600 !important;
+            font-size: var(--base-font-size) !important;
+        }
         .gr-panel {background: #1a1a1a !important;}
         .tabitem {background: #1a1a1a !important;}
         .tabs > .tab-nav {background: #0a0a0a !important;}
@@ -236,9 +285,10 @@ def build_interface():
             background: #2563eb !important;
             color: white !important;
             border: 1px solid #1e40af !important;
-            padding: 4px 8px !important;
+            padding: var(--button-padding) !important;
             margin-left: auto !important;
-            min-width: 80px !important;
+            min-width: 90px !important;
+            font-size: var(--button-font-size) !important;
         }
         .copy-feedback-btn:hover {
             background: #1d4ed8 !important;
@@ -248,6 +298,8 @@ def build_interface():
             color: #f0f0f0 !important;
             background: #2a2a2a !important;
             border: 1px solid #606060 !important;
+            font-size: var(--button-font-size) !important;
+            padding: var(--button-padding) !important;
         }
         .tab-nav button.selected,
         .tab-nav button[aria-selected="true"] {
@@ -291,8 +343,9 @@ def build_interface():
         .item {
             color: #f0f0f0 !important;
             background: #1a1a1a !important;
-            padding: 8px 12px !important;
+            padding: var(--spacing-md) !important;
             font-weight: 500 !important;
+            font-size: var(--base-font-size) !important;
         }
         .gr-dropdown li:hover,
         .gr-dropdown-item:hover,
@@ -306,20 +359,31 @@ def build_interface():
             color: #ffffff !important;
         }
         
-        /* Checkboxes and Radio buttons */
+        /* Checkboxes and Radio buttons - responsive sizing */
         input[type="checkbox"] {
+            width: 22px !important;
+            height: 22px !important;
+            cursor: pointer !important;
+            accent-color: #0066ff !important;
+            border: 2px solid #606060 !important;
+        }
+        input[type="radio"] {
             width: 20px !important;
             height: 20px !important;
             cursor: pointer !important;
             accent-color: #0066ff !important;
             border: 2px solid #606060 !important;
         }
-        input[type="radio"] {
-            width: 18px !important;
-            height: 18px !important;
-            cursor: pointer !important;
-            accent-color: #0066ff !important;
-            border: 2px solid #606060 !important;
+        
+        @media (max-width: 1919px) {
+            input[type="checkbox"] {
+                width: 18px !important;
+                height: 18px !important;
+            }
+            input[type="radio"] {
+                width: 16px !important;
+                height: 16px !important;
+            }
         }
         
         /* Dataframe/Table styling */
@@ -331,15 +395,17 @@ def build_interface():
             background: #0066ff !important;
             color: #ffffff !important;
             font-weight: 700 !important;
-            padding: 10px !important;
+            padding: var(--spacing-md) !important;
             border: 2px solid #0044cc !important;
+            font-size: var(--base-font-size) !important;
         }
         .gr-dataframe td {
             color: #f0f0f0 !important;
             background: #1a1a1a !important;
             border: 1px solid #606060 !important;
-            padding: 8px !important;
+            padding: var(--spacing-sm) !important;
             font-weight: 500 !important;
+            font-size: var(--base-font-size) !important;
         }
         .gr-dataframe tr:hover td {
             background: #2a2a2a !important;
@@ -375,9 +441,13 @@ def build_interface():
         }
         
         /* Common styles */
-        .gr-button {font-weight: 600 !important; padding: 6px 12px !important;}
-        .gr-box {padding: 8px !important;}
-        .gr-form {gap: 6px !important;}
+        .gr-button {
+            font-weight: 600 !important; 
+            padding: var(--button-padding) !important;
+            font-size: var(--button-font-size) !important;
+        }
+        .gr-box {padding: var(--spacing-sm) !important;}
+        .gr-form {gap: var(--spacing-sm) !important;}
         
         /* Tab styling */
         .tabs {
@@ -385,18 +455,18 @@ def build_interface():
             padding: 0 !important;
         }
         .tabs > .tab-nav {
-            padding: 8px 4px !important;
+            padding: var(--spacing-md) var(--spacing-sm) !important;
             margin: 0 !important;
             border-bottom: 2px solid #0066ff !important;
             display: flex !important;
             flex-wrap: wrap !important;
         }
         .tab-nav button {
-            min-width: 100px !important;
-            height: 44px !important;
-            font-size: 13px !important;
+            min-width: 120px !important;
+            height: 48px !important;
+            font-size: var(--button-font-size) !important;
             font-weight: 700 !important;
-            padding: 10px 16px !important;
+            padding: var(--spacing-md) var(--spacing-lg) !important;
             margin: 2px !important;
             border-radius: 4px !important;
         }
@@ -411,9 +481,9 @@ def build_interface():
             border: 2px solid #404040 !important;
             background: #2a2a2a !important;
             color: #e0e0e0 !important;
-            font-size: 13px !important;
+            font-size: var(--button-font-size) !important;
             font-weight: 600 !important;
-            padding: 10px 20px !important;
+            padding: var(--spacing-md) var(--spacing-lg) !important;
             transition: all 0.2s ease !important;
         }
         .theme-btn:hover {
