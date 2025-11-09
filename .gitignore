@@ -22,8 +22,7 @@ pip-delete-this-directory.txt
 *.db
 *.sqlite
 *.sqlite3
-data/*.db
-data/database.db
+!data/**
 
 # Temporary Files
 *.tmp
@@ -33,7 +32,6 @@ data/database.db
 *~
 
 # Upload/Export Directories (don't commit user uploads/exports)
-data/uploads/
 exports/
 !exports/.gitkeep
 

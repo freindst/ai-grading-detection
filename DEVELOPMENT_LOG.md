@@ -14,6 +14,13 @@ This document tracks ongoing development activity, recent changes, and work in p
 - None
 
 ### Recently Completed
+- ✅ **DevOps: Podman Containerization Support** - Added portable container workflow for the grading assistant
+  - **Artifacts**: Created `Containerfile` targeting Python 3.11-slim and new `podman-run.sh` helper script (builds image, mounts `data/`, forwards port 7860, reuses `.env`)
+  - **Build Context**: Added `.containerignore` to exclude virtual environments, caches, local data, and planning files from the image
+  - **Data Portability**: Adjusted `.gitignore`/`.containerignore` so the `data/` directory is version-controlled and bundled in container builds for easier migration
+  - **Ollama Connectivity**: Script auto-detects a sensible `OLLAMA_HOST` (prefers `host.containers.internal` for native Podman on Windows/macOS, falls back to Windows host IP when run from WSL)
+  - **Documentation**: Updated `README.md` with Podman deployment instructions and platform-specific Ollama connectivity tips
+  - **Testing**: Container build/run not executed in this environment (documentation-only update)
 - ✅ **UI: Responsive Design Implementation** - Adaptive scaling for ultrawide and Full HD displays
   - **Problem**: Default font sizes (11px) were too small for 3440x1440 displays, requiring 175% zoom
   - **Solution**: CSS custom properties with media queries for responsive scaling

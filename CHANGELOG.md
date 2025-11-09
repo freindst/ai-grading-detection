@@ -30,8 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Classic View: File upload (left column) → Text submission (right column)
   - Split View: File upload → Text submission (vertical order)
   - More intuitive workflow for file-based grading (PDFs, DOCX, images)
+- **Repository Data Handling**: Updated `.gitignore` and `.containerignore` so the `data/` directory is tracked in Git and copied into container builds, improving portability when running on new machines
 
 ### Added
+- **Podman Container Support**: Added container artifacts for portable deployment
+  - New `Containerfile` builds a Python 3.11 image that installs project dependencies and exposes Gradio on port 7860
+  - `podman-run.sh` script builds/runs the image, mounts the host `data/` directory, reuses `.env`, and forwards port 7860
+  - Script auto-detects the best `OLLAMA_HOST` (uses `host.containers.internal` for native Podman on Windows/macOS, falls back to detected Windows IP in WSL) while still allowing manual overrides
+  - Created `.containerignore` to keep the image lean by excluding virtual envs, caches, and local data during build
 - **Copy Grade Button**: Added one-click copy button for extracted grade
   - Button appears in the header next to "Extracted Grade" (top-right corner)
   - Same distinctive blue styling as student feedback copy button for consistency

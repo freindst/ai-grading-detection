@@ -89,6 +89,33 @@ python -m src.app
 
 The application will be available at `http://localhost:7860`
 
+### Podman Deployment (Optional)
+
+You can run the grading assistant inside a Podman container while keeping Ollama on the host machine.
+
+1. Ensure Podman is installed and, on macOS/Windows, start the Podman machine (`podman machine init && podman machine start`).
+2. Make sure Ollama is running on the host (`ollama serve`) and accessible (typically `http://localhost:11434`).
+3. Build and launch the container:
+
+   ```bash
+   chmod +x podman-run.sh
+   ./podman-run.sh
+   ```
+
+   - The script builds the image from `Containerfile`, mounts the host `data/` directory into the container, and re-uses `.env` if present.
+   - It automatically sets `OLLAMA_HOST` based on your environment: defaults to `http://host.containers.internal:11434` for native Podman on Windows/macOS and falls back to your Windows host IP when run from WSL.
+   - Override any value by exporting an environment variable before running the script (e.g., `export OLLAMA_HOST=http://localhost:11434` on Linux).
+
+4. Access the UI at `http://localhost:7860`.
+
+**Platform notes**
+
+- **WSL / Windows host Ollama**: Keep Ollama running on Windows and run Podman inside WSL. The default `host.containers.internal` address resolves to the Windows host. If you use a different address, set `OLLAMA_HOST` accordingly in `.env` or the environment.
+- **macOS**: Start `ollama serve` on macOS and run Podman via `podman machine`. The default host address works out of the box.
+- **Linux**: When Podman runs on the same Linux host as Ollama, override `OLLAMA_HOST` to `http://localhost:11434` or use `--network host` if you prefer host networking.
+
+The application will still be available at `http://localhost:7860` while the container is running.
+
 ## Usage Guide
 
 ### 1. Text Input Grading (Tab 1)

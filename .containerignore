@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+exports/
+*.log
+tests/__pycache__
+.mypy_cache
+.pytest_cache
+.cursorignore
+.cursorrules
+pod.plan.md
+
