@@ -37,6 +37,16 @@ An AI-powered college homework grading assistant using local LLM models via Olla
 ✅ **Summary Statistics**: Grade distribution, success rates, plagiarism summary  
 ✅ **Customizable Exports**: Full feedback or summary versions  
 
+### Canvas LMS Integration (New!)
+✅ **Canvas Authentication**: Secure token-based authentication with encryption  
+✅ **Course & Assignment Management**: Browse courses and assignments from Canvas  
+✅ **Auto-Download Submissions**: Download all student submissions automatically  
+✅ **AI-Powered Grading**: Grade all submissions using LLM with custom rubrics  
+✅ **Manual Review Interface**: Review, edit, and correct AI-generated grades  
+✅ **Raw JSON Viewing**: Debug parser errors by viewing complete LLM output  
+✅ **Session Management**: Track multiple grading sessions with full history  
+✅ **Batch Upload**: Upload all reviewed grades to Canvas in one click  
+
 ## Prerequisites
 
 1. **Python 3.10+**
@@ -156,6 +166,76 @@ The application will still be available at `http://localhost:7860` while the con
 - **Reference Verification**: Automatically check citations
 - **Flexible Parsing**: Multiple strategies for extracting grades
 - **Feedback Collection**: Improve grading over time
+
+### 6. Canvas LMS Integration (Tab 5)
+
+#### Step 1: Authentication
+1. Navigate to the **Canvas LMS** tab
+2. Enter your Canvas instance URL (e.g., `https://cuwaa.instructure.com/`)
+3. Generate an access token from Canvas:
+   - Log in to Canvas → Account → Settings → "+ New Access Token"
+   - Copy the generated token
+4. Paste the token in the application and click **Connect & Verify**
+5. System will verify connection and load your courses
+
+#### Step 2: Select Course & Assignment
+1. Choose a course from the dropdown (populated after authentication)
+2. Select an assignment to grade
+3. View assignment details (due date, points possible, submission count)
+
+#### Step 3: Configure Grading
+1. Enter assignment instructions
+2. Enter grading criteria/rubric
+3. Set output format (numeric recommended for Canvas)
+4. Set maximum score
+5. Add AI keywords (optional)
+6. Select LLM model and temperature
+
+#### Step 4: Download & Grade
+1. Click **Download & Grade All Submissions**
+2. System will:
+   - Download all student submissions from Canvas
+   - Extract text from each submission
+   - Grade with LLM using your criteria
+   - Store BOTH raw JSON output AND parsed results
+   - Create a grading session in the database
+3. Progress bar shows grading status
+
+#### Step 5: Review Grades
+1. Note the Session ID from the result message
+2. Enter Session ID and click **Load Session**
+3. Review the grades table:
+   - **Parsed Grade**: AI-extracted grade
+   - **Final Grade**: Editable grade (defaults to parsed)
+   - **Status**: Needs Review / Reviewed
+   - **Upload Status**: Pending / Uploaded / Failed
+
+#### Step 6: Edit Individual Grades
+1. Enter a Grade ID from the table
+2. Click **Load Grade** to see details
+3. Review:
+   - Student name
+   - Parsed grade (what AI extracted)
+   - Manual grade (editable)
+   - Comments (editable)
+   - **Raw LLM JSON** (full output for debugging)
+4. Edit grade/comments if needed
+5. Check "Mark as Reviewed"
+6. Click **Save Grade**
+
+**Pro Tip**: Click "Accept All Parsed Grades" to quickly accept all AI grades at once
+
+#### Step 7: Upload to Canvas
+1. Once all grades are reviewed, click **Upload All Reviewed Grades**
+2. System uploads grades and comments to Canvas in batch
+3. View upload results (success/failure for each student)
+4. Alternatively, upload individual grades using Grade ID
+
+### Security Note
+- Access tokens are encrypted using `cryptography.fernet`
+- Encrypted tokens stored in database
+- Encryption key stored in `data/.canvas_key`
+- Never share your access token or `.canvas_key` file
 
 ## Project Structure
 

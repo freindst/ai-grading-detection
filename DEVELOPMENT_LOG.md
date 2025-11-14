@@ -4,7 +4,7 @@ This document tracks ongoing development activity, recent changes, and work in p
 
 **Project**: Grading Assistant System  
 **Status**: Production Ready (v1.0.0)  
-**Last Updated**: November 3, 2025
+**Last Updated**: November 13, 2025
 
 ---
 
@@ -14,6 +14,71 @@ This document tracks ongoing development activity, recent changes, and work in p
 - None
 
 ### Recently Completed
+- ✅ **Feature: Canvas Spreadsheet View for Bulk Grade Editing** - Added spreadsheet-style bulk editing interface for Canvas grades
+  - **Problem**: One-by-one grade editing is time-consuming for instructors with 50+ students
+  - **User Requirements**: View all submissions with grade, comments, submission text, detailed feedback, and raw JSON in one table; edit multiple grades; save all at once
+  - **Solution**: New "📊 Spreadsheet View (Bulk Edit)" accordion in Canvas LMS tab
+  - **Components**:
+    - Editable Gradio Dataframe with 9 columns: ID, Student, Parsed Grade (reference), Final Grade (editable), Comments (editable), Submission preview, Detailed Feedback, Raw JSON preview, Needs Review status
+    - Load button to populate dataframe from grading session
+    - "Save All Changes" button to bulk update all modified grades
+    - "Mark All as Reviewed" checkbox to approve all grades at once
+    - "Export Full CSV" button to download complete dataset (no truncation) for offline review
+  - **Handler Functions** (`src/ui/canvas_handlers.py`):
+    - `load_grades_spreadsheet()`: Queries database, builds dataframe rows, truncates long fields to 200 chars for display
+    - `save_bulk_grades()`: Parses modified dataframe, updates database for each changed grade, returns success/error counts
+    - `export_grades_csv()`: Generates CSV with all fields (untruncated), saved to `data/canvas_exports/session_{id}_{timestamp}.csv`
+  - **Key Features**:
+    - Non-destructive: Parsed grades remain visible for reference while editing final grades
+    - Full context: See submission text, feedback, and raw JSON while editing
+    - Bulk operations: Edit 10, 20, 50+ grades before saving (instead of one-at-a-time)
+    - CSV archiving: Download complete grading data for records/offline analysis
+    - Complements existing one-by-one editor (both workflows available)
+  - **Files**: `src/app.py` (+53 lines UI, +18 lines event handlers), `src/ui/canvas_handlers.py` (+199 lines handlers)
+- ✅ **Fix: Canvas Grading Error & File Download Implementation** - Fixed grade_submission call and implemented full file attachment support
+  - **Problem 1**: Canvas grading failed with "GradingEngine.grade_submission() got an unexpected keyword argument 'model'"
+  - **Problem 2**: File attachments (PDF, DOCX, images) were not being downloaded or parsed - only filenames were recorded
+  - **Solution**:
+    - **Part 1 - Fixed Grade Submission Call**: Modified `canvas_grading_manager.py` to set model on `llm_client` before grading loop, removed `model=` and `clear_context=` arguments from `grade_submission()` call, fixed result parsing to use `result["parsed_result"]`, added explicit `llm_client.clear_context()` after each submission
+    - **Part 2 - Added File Download**: Created `download_attachment()` method in `canvas_client.py` that downloads Canvas file attachments with authentication to local storage
+    - **Part 3 - Parse Downloaded Files**: Modified grading loop to download all attachments to `data/canvas_submissions/{course_id}/{assignment_id}/`, parse each file with `document_parser`, combine all parsed text into submission text, and include metadata about submitted/failed files
+    - **Part 4 - Enhanced Error Logging**: Added logging imports and setup in `canvas_grading_manager.py`, logs grading failures and download/parse errors to `data/logs/canvas_errors.log` with full tracebacks
+  - **File Storage**: Downloaded files are stored in `data/canvas_submissions/{course_id}/{assignment_id}/` directory structure (permanent storage organized by course/assignment)
+  - **Error Handling**: Robust error handling for download failures, parse failures, and empty files - logs all errors and continues grading remaining submissions
+  - **Result**: Canvas grading now works correctly with proper model selection, file attachments are downloaded and parsed, and comprehensive error logging is in place
+  - **Files**: `src/canvas_grading_manager.py`, `src/canvas_client.py`
+- ✅ **Feature: Canvas LMS Integration** - Complete workflow for Canvas assignment grading
+  - **Problem**: Manual workflow to download submissions from Canvas, grade with AI, review results, and upload back to Canvas
+  - **Solution**: Full Canvas LMS integration with authentication, download, auto-grading, manual review, and upload capabilities
+  - **Components Created**:
+    - `src/canvas_client.py`: Canvas API wrapper for authentication, courses, assignments, submissions, and grade uploads
+    - `src/canvas_grading_manager.py`: Orchestrates download → LLM grading → database storage workflow
+    - `src/ui/canvas_handlers.py`: UI event handlers for all Canvas operations
+  - **Database**: Added 3 new tables (canvas_credentials, canvas_grading_sessions, canvas_submission_grades) and 10 new methods
+  - **Security**: Token encryption using `cryptography.fernet` (stores encrypted tokens in database and `.canvas_key` file)
+  - **Storage Strategy**: Stores BOTH raw LLM JSON output AND parsed results for manual verification
+  - **UI**: Complete Canvas LMS tab with 5 sections:
+    - Authentication & Setup
+    - Course & Assignment Selection
+    - Grading Configuration
+    - Grading Sessions List
+    - Grade Review & Editor (view parsed grades, edit manually, view raw JSON, mark reviewed)
+    - Upload to Canvas (batch upload or single grade)
+  - **Workflow**: 
+    1. Connect with Canvas token → verify credentials
+    2. Select course and assignment → configure grading criteria
+    3. Download & grade all submissions → stores raw JSON + parsed results
+    4. Review each grade → edit if needed → view raw JSON output
+    5. Accept all or manually correct grades → mark as reviewed
+    6. Upload all reviewed grades to Canvas in batch
+  - **Key Features**:
+    - Session-based grading (historical record of all grading attempts)
+    - Manual grade override (preserves both parsed and manual values)
+    - Raw JSON viewing (for parser error debugging)
+    - Filter grades (All / Needs Review / Ready to Upload)
+    - Batch or individual grade upload
+  - **Dependencies**: Added `cryptography>=41.0.0` to requirements.txt
+  - **Files**: `src/canvas_client.py`, `src/canvas_grading_manager.py`, `src/ui/canvas_handlers.py`, `src/database.py`, `src/app.py`, `requirements.txt`
 - ✅ **DevOps: Podman Containerization Support** - Added portable container workflow for the grading assistant
   - **Artifacts**: Created `Containerfile` targeting Python 3.11-slim and new `podman-run.sh` helper script (builds image, mounts `data/`, forwards port 7860, reuses `.env`)
   - **Build Context**: Added `.containerignore` to exclude virtual environments, caches, local data, and planning files from the image

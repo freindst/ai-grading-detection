@@ -103,6 +103,66 @@ class DatabaseManager:
             )
         """)
         
+        # Canvas credentials table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS canvas_credentials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                canvas_url TEXT NOT NULL,
+                access_token_encrypted TEXT NOT NULL,
+                instructor_name TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_verified TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Canvas grading sessions table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS canvas_grading_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                canvas_assignment_id INTEGER NOT NULL,
+                canvas_course_id INTEGER NOT NULL,
+                course_name TEXT NOT NULL,
+                assignment_name TEXT NOT NULL,
+                total_submissions INTEGER DEFAULT 0,
+                graded_count INTEGER DEFAULT 0,
+                uploaded_count INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'pending',
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                assignment_instructions TEXT,
+                grading_criteria TEXT,
+                output_format TEXT DEFAULT 'numeric',
+                max_score INTEGER DEFAULT 100
+            )
+        """)
+        
+        # Canvas submission grades table (THE KEY TABLE)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS canvas_submission_grades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                canvas_submission_id INTEGER NOT NULL,
+                student_id INTEGER NOT NULL,
+                student_name TEXT NOT NULL,
+                submission_text TEXT,
+                submission_url TEXT,
+                raw_llm_json TEXT,
+                parsed_grade TEXT,
+                parsed_detailed_feedback TEXT,
+                parsed_student_feedback TEXT,
+                manual_grade TEXT,
+                manual_comments TEXT,
+                final_grade TEXT,
+                final_comments TEXT,
+                needs_review BOOLEAN DEFAULT 1,
+                reviewed_at TIMESTAMP,
+                uploaded_at TIMESTAMP,
+                upload_status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES canvas_grading_sessions(id) ON DELETE CASCADE
+            )
+        """)
+        
         conn.commit()
         conn.close()
         
@@ -192,38 +252,6 @@ class DatabaseManager:
         conn.close()
         
         return [dict(row) for row in rows]
-    
-    def update_course(self, course_id: int, name: str = None, description: str = None) -> bool:
-        """Update course"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        updates = []
-        values = []
-        
-        if name:
-            updates.append("name = ?")
-            values.append(name)
-        if description is not None:
-            updates.append("description = ?")
-            values.append(description)
-        
-        if not updates:
-            conn.close()
-            return False
-        
-        updates.append("updated_at = CURRENT_TIMESTAMP")
-        values.append(course_id)
-        
-        cursor.execute(
-            f"UPDATE courses SET {', '.join(updates)} WHERE id = ?",
-            tuple(values)
-        )
-        success = cursor.rowcount > 0
-        conn.commit()
-        conn.close()
-        
-        return success
     
     def delete_course(self, course_id: int) -> bool:
         """Delete course"""
@@ -321,47 +349,6 @@ class DatabaseManager:
         conn.close()
         
         return [dict(row) for row in rows]
-    
-    def update_assignment(
-        self,
-        assignment_id: int,
-        name: str = None,
-        description: str = None,
-        instructions: str = None
-    ) -> bool:
-        """Update assignment"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        updates = []
-        values = []
-        
-        if name:
-            updates.append("name = ?")
-            values.append(name)
-        if description is not None:
-            updates.append("description = ?")
-            values.append(description)
-        if instructions is not None:
-            updates.append("instructions = ?")
-            values.append(instructions)
-        
-        if not updates:
-            conn.close()
-            return False
-        
-        updates.append("updated_at = CURRENT_TIMESTAMP")
-        values.append(assignment_id)
-        
-        cursor.execute(
-            f"UPDATE assignments SET {', '.join(updates)} WHERE id = ?",
-            tuple(values)
-        )
-        success = cursor.rowcount > 0
-        conn.commit()
-        conn.close()
-        
-        return success
     
     def delete_assignment(self, assignment_id: int) -> bool:
         """Delete assignment"""
@@ -628,4 +615,353 @@ class DatabaseManager:
         conn.close()
         
         return [dict(row) for row in rows]
+    
+    # Canvas LMS methods
+    def store_canvas_credentials(self, canvas_url: str, access_token_encrypted: str, instructor_name: str = None) -> int:
+        """
+        Store encrypted Canvas credentials
+        
+        Args:
+            canvas_url: Canvas instance URL
+            access_token_encrypted: Encrypted access token
+            instructor_name: Instructor's name (optional)
+            
+        Returns:
+            Credential ID
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Delete existing credentials (only keep one set)
+        cursor.execute("DELETE FROM canvas_credentials")
+        
+        cursor.execute(
+            """INSERT INTO canvas_credentials 
+            (canvas_url, access_token_encrypted, instructor_name, last_verified)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)""",
+            (canvas_url, access_token_encrypted, instructor_name)
+        )
+        cred_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return cred_id
+    
+    def get_canvas_credentials(self) -> Optional[Dict]:
+        """
+        Retrieve Canvas credentials (returns most recent)
+        
+        Returns:
+            Dictionary with canvas_url, access_token_encrypted, instructor_name
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT * FROM canvas_credentials ORDER BY created_at DESC LIMIT 1"
+        )
+        row = cursor.fetchone()
+        conn.close()
+        
+        return dict(row) if row else None
+    
+    def create_grading_session(
+        self,
+        canvas_assignment_id: int,
+        canvas_course_id: int,
+        course_name: str,
+        assignment_name: str,
+        total_submissions: int,
+        assignment_instructions: str = "",
+        grading_criteria: str = "",
+        output_format: str = "numeric",
+        max_score: int = 100
+    ) -> int:
+        """
+        Create a new Canvas grading session
+        
+        Returns:
+            Session ID
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            """INSERT INTO canvas_grading_sessions 
+            (canvas_assignment_id, canvas_course_id, course_name, assignment_name, 
+            total_submissions, assignment_instructions, grading_criteria, 
+            output_format, max_score, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'in_progress')""",
+            (canvas_assignment_id, canvas_course_id, course_name, assignment_name,
+             total_submissions, assignment_instructions, grading_criteria,
+             output_format, max_score)
+        )
+        session_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return session_id
+    
+    def save_submission_grade(
+        self,
+        session_id: int,
+        canvas_submission_id: int,
+        student_id: int,
+        student_name: str,
+        submission_text: str,
+        raw_llm_json: str,
+        parsed_grade: str,
+        parsed_detailed_feedback: str,
+        parsed_student_feedback: str,
+        submission_url: str = ""
+    ) -> int:
+        """
+        Store parsed grade + raw JSON for a submission
+        
+        Returns:
+            Submission grade ID
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Set final values to parsed values initially
+        cursor.execute(
+            """INSERT INTO canvas_submission_grades 
+            (session_id, canvas_submission_id, student_id, student_name,
+            submission_text, submission_url, raw_llm_json,
+            parsed_grade, parsed_detailed_feedback, parsed_student_feedback,
+            final_grade, final_comments, needs_review)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)""",
+            (session_id, canvas_submission_id, student_id, student_name,
+             submission_text, submission_url, raw_llm_json,
+             parsed_grade, parsed_detailed_feedback, parsed_student_feedback,
+             parsed_grade, parsed_student_feedback)
+        )
+        grade_id = cursor.lastrowid
+        
+        # Update session graded count
+        cursor.execute(
+            """UPDATE canvas_grading_sessions 
+            SET graded_count = graded_count + 1 
+            WHERE id = ?""",
+            (session_id,)
+        )
+        
+        conn.commit()
+        conn.close()
+        
+        return grade_id
+    
+    def update_manual_grade(
+        self,
+        grade_id: int,
+        manual_grade: str = None,
+        manual_comments: str = None,
+        mark_reviewed: bool = False
+    ) -> bool:
+        """
+        Update manual grade/comments (instructor edits)
+        
+        Returns:
+            Success boolean
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        updates = []
+        params = []
+        
+        if manual_grade is not None:
+            updates.append("manual_grade = ?")
+            updates.append("final_grade = ?")
+            params.append(manual_grade)
+            params.append(manual_grade)
+        
+        if manual_comments is not None:
+            updates.append("manual_comments = ?")
+            updates.append("final_comments = ?")
+            params.append(manual_comments)
+            params.append(manual_comments)
+        
+        if mark_reviewed:
+            updates.append("needs_review = 0")
+            updates.append("reviewed_at = CURRENT_TIMESTAMP")
+        
+        if not updates:
+            conn.close()
+            return False
+        
+        params.append(grade_id)
+        cursor.execute(
+            f"UPDATE canvas_submission_grades SET {', '.join(updates)} WHERE id = ?",
+            params
+        )
+        
+        success = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        
+        return success
+    
+    def get_session_grades(self, session_id: int, filter_type: str = "all") -> List[Dict]:
+        """
+        Get all grades for a grading session
+        
+        Args:
+            session_id: Session ID
+            filter_type: 'all', 'needs_review', or 'ready_to_upload'
+            
+        Returns:
+            List of grade dictionaries
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        base_query = "SELECT * FROM canvas_submission_grades WHERE session_id = ?"
+        params = [session_id]
+        
+        if filter_type == "needs_review":
+            base_query += " AND needs_review = 1"
+        elif filter_type == "ready_to_upload":
+            base_query += " AND needs_review = 0 AND upload_status = 'pending'"
+        
+        base_query += " ORDER BY student_name"
+        
+        cursor.execute(base_query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+    
+    def mark_grade_uploaded(self, grade_id: int, success: bool = True) -> bool:
+        """
+        Mark a grade as uploaded to Canvas
+        
+        Returns:
+            Success boolean
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        status = "uploaded" if success else "failed"
+        
+        cursor.execute(
+            """UPDATE canvas_submission_grades 
+            SET upload_status = ?, uploaded_at = CURRENT_TIMESTAMP 
+            WHERE id = ?""",
+            (status, grade_id)
+        )
+        
+        # Update session uploaded count if successful
+        if success:
+            cursor.execute(
+                """UPDATE canvas_grading_sessions 
+                SET uploaded_count = uploaded_count + 1 
+                WHERE id = (SELECT session_id FROM canvas_submission_grades WHERE id = ?)""",
+                (grade_id,)
+            )
+        
+        result = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        
+        return result
+    
+    def get_unuploaded_grades(self, session_id: int) -> List[Dict]:
+        """
+        Get all grades that haven't been uploaded yet
+        
+        Returns:
+            List of grade dictionaries ready for upload
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            """SELECT * FROM canvas_submission_grades 
+            WHERE session_id = ? AND upload_status = 'pending' AND needs_review = 0
+            ORDER BY student_name""",
+            (session_id,)
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+    
+    def get_all_grading_sessions(self) -> List[Dict]:
+        """
+        Get all Canvas grading sessions
+        
+        Returns:
+            List of session dictionaries
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT * FROM canvas_grading_sessions ORDER BY started_at DESC"
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+    
+    def get_grading_session(self, session_id: int) -> Optional[Dict]:
+        """
+        Get a specific grading session by ID
+        
+        Returns:
+            Session dictionary or None
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT * FROM canvas_grading_sessions WHERE id = ?",
+            (session_id,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        
+        return dict(row) if row else None
+    
+    def update_session_status(self, session_id: int, status: str, completed: bool = False) -> bool:
+        """
+        Update grading session status
+        
+        Args:
+            session_id: Session ID
+            status: Status string ('in_progress', 'completed', 'error')
+            completed: Whether to set completed_at timestamp
+            
+        Returns:
+            Success boolean
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        if completed:
+            cursor.execute(
+                """UPDATE canvas_grading_sessions 
+                SET status = ?, completed_at = CURRENT_TIMESTAMP 
+                WHERE id = ?""",
+                (status, session_id)
+            )
+        else:
+            cursor.execute(
+                "UPDATE canvas_grading_sessions SET status = ? WHERE id = ?",
+                (status, session_id)
+            )
+        
+        success = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        
+        return success
+
 

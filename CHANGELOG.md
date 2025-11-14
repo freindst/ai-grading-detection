@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Canvas Spreadsheet View (Bulk Edit)**: New spreadsheet-style interface for reviewing and editing multiple Canvas grades at once
+  - Editable dataframe showing all submissions with: Student, Parsed Grade (reference), Final Grade (editable), Comments (editable), Submission preview, Detailed Feedback, Raw JSON preview, Needs Review status
+  - "Load Spreadsheet" button to populate all grades from a grading session
+  - "Save All Changes" button for bulk updating all modified grades in one operation
+  - "Mark All as Reviewed" checkbox to approve all grades simultaneously
+  - "Export Full CSV" button to download complete grade dataset (untruncated) for offline review/archiving
+  - Complements existing one-by-one grade editor (both workflows available based on instructor preference)
+  - CSV exports saved to `data/canvas_exports/` with timestamp
+  - New handlers: `load_grades_spreadsheet()`, `save_bulk_grades()`, `export_grades_csv()` in `src/ui/canvas_handlers.py`
+- **Canvas LMS Integration**: Complete workflow for downloading, grading, and uploading Canvas assignments
+  - New Canvas LMS tab with authentication, course/assignment selection, and grading configuration
+  - Canvas API client (`src/canvas_client.py`) for all Canvas operations (auth, courses, assignments, submissions, grade uploads)
+  - Canvas grading manager (`src/canvas_grading_manager.py`) orchestrates download → LLM grading → storage workflow
+  - Three new database tables: `canvas_credentials`, `canvas_grading_sessions`, `canvas_submission_grades`
+  - Stores BOTH raw LLM JSON output AND parsed results for manual verification and debugging
+  - Session-based grading with historical record of all grading attempts
+  - Grade review interface with inline editing, raw JSON viewing, and manual override
+  - Filter grades by status (All / Needs Review / Ready to Upload)
+  - Batch or individual grade upload to Canvas
+  - Secure token encryption using `cryptography.fernet`
+  - UI handlers in `src/ui/canvas_handlers.py` for all Canvas operations
+  - Added `cryptography>=41.0.0` dependency
+
 ### Removed
 - **Simple Layout**: Removed unused Simple Layout code (dead code cleanup)
   - Simple Layout was never accessible to users (no toggle button, always hidden)
@@ -61,6 +85,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fully integrated with existing grading engine and course/profile system
 
 ### Fixed
+- **Canvas Rate Limit Parsing Error**: Fixed "invalid literal for int() with base 10: '700.0'" error
+  - Root cause: Canvas API returns rate limit as decimal string (e.g., "700.0"), but code used `int()` directly
+  - Solution: Changed to `int(float(remaining))` with try-except fallback to safe default (600)
+  - This fix was implemented twice due to code reformatting removing the original fix
+- **Canvas Grading Error**: Fixed "GradingEngine.grade_submission() got an unexpected keyword argument 'model'" error
+  - Root cause: `canvas_grading_manager.py` was passing `model=` and `clear_context=` arguments to `grade_submission()` which doesn't accept them
+  - Solution: Set model on `llm_client` before grading loop, removed invalid arguments, fixed result parsing to use `result["parsed_result"]`
+  - Added explicit `llm_client.clear_context()` call after each submission for proper context isolation
+- **Canvas File Attachments**: Implemented full download and parsing for Canvas file submissions
+  - Added `download_attachment()` method to `canvas_client.py` for authenticated file downloads
+  - Modified grading loop to download all attachments to `data/canvas_submissions/{course_id}/{assignment_id}/`
+  - Integrated with `document_parser` to extract text from PDF, DOCX, and image files
+  - Combined all parsed text into submission for LLM grading
+  - Added comprehensive error logging to `data/logs/canvas_errors.log` with full tracebacks
+  - Robust error handling for download failures, parse failures, and empty files
 - **Split View Grading Error (ROOT CAUSE FIXED)**: Completely resolved `'int' object has no attribute 'to_json'` error
   - Root cause: `split_context_bar` was created as `gr.BarPlot` instead of `gr.Slider`
   - Issue: BarPlot expects complex data structure, but grading function returns integer percentage

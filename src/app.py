@@ -13,9 +13,11 @@ from src.grading_engine import GradingEngine
 from src.document_parser import DocumentParser
 from src.batch_processor import BatchProcessor
 from src.database import DatabaseManager
+from src.canvas_client import CanvasClient
+from src.canvas_grading_manager import CanvasGradingManager
 
 # UI modules
-from src.ui import course_handlers, profile_handlers, grading_handlers
+from src.ui import course_handlers, profile_handlers, grading_handlers, canvas_handlers
 
 # Initialize global components (shared across all modules)
 llm_client = OllamaClient()
@@ -23,6 +25,8 @@ grading_engine = GradingEngine(llm_client)
 document_parser = DocumentParser()
 batch_processor = BatchProcessor(grading_engine, max_workers=3)
 db_manager = DatabaseManager()
+canvas_client = CanvasClient()
+canvas_grading_manager = CanvasGradingManager(canvas_client, grading_engine, db_manager, document_parser)
 
 
 def get_installed_models():
@@ -763,6 +767,203 @@ def build_interface():
                                 interactive=True
                             )
                             update_fewshot_btn = gr.Button("Update Few-Shot Status", size="sm", variant="primary")
+                    
+                    with gr.Tab("🎓 Canvas LMS", id=4):
+                        gr.Markdown("### Canvas LMS Integration")
+                        gr.Markdown("Connect to Canvas to download student submissions, grade with AI, and upload results.")
+                        
+                        # Section A: Canvas Setup & Download
+                        with gr.Accordion("🔐 Authentication & Setup", open=True):
+                            gr.Markdown("#### Connect to Canvas")
+                            canvas_url_input = gr.Textbox(
+                                label="Canvas URL",
+                                value="https://cuwaa.instructure.com/",
+                                placeholder="https://your-institution.instructure.com/"
+                            )
+                            canvas_token_input = gr.Textbox(
+                                label="Access Token",
+                                type="password",
+                                placeholder="Paste your Canvas API token here"
+                            )
+                            connect_canvas_btn = gr.Button("🔗 Connect & Verify", variant="primary")
+                            canvas_status = gr.Textbox(label="Status", interactive=False, max_lines=3)
+                            canvas_instructor_name = gr.Textbox(label="Instructor", visible=False)
+                        
+                        with gr.Accordion("📚 Course & Assignment Selection", open=True):
+                            canvas_course_dropdown = gr.Dropdown(
+                                label="Select Course",
+                                choices=[],
+                                interactive=True
+                            )
+                            canvas_assignment_dropdown = gr.Dropdown(
+                                label="Select Assignment",
+                                choices=[],
+                                interactive=True
+                            )
+                            canvas_assignment_details = gr.Markdown("Select a course and assignment to see details")
+                        
+                        with gr.Accordion("⚙️ Grading Configuration", open=True):
+                            with gr.Row():
+                                with gr.Column():
+                                    canvas_instructions = gr.Textbox(
+                                        label="Assignment Instructions",
+                                        placeholder="Enter assignment instructions here...",
+                                        lines=5
+                                    )
+                                    canvas_criteria = gr.Textbox(
+                                        label="Grading Criteria/Rubric",
+                                        placeholder="Enter grading rubric here...",
+                                        lines=5
+                                    )
+                                with gr.Column():
+                                    canvas_output_format = gr.Radio(
+                                        label="Output Format",
+                                        choices=["numeric", "letter"],
+                                        value="numeric"
+                                    )
+                                    canvas_max_score = gr.Number(
+                                        label="Maximum Score",
+                                        value=100,
+                                        precision=0
+                                    )
+                                    canvas_ai_keywords = gr.Textbox(
+                                        label="AI Keywords (optional)",
+                                        placeholder="chatgpt, copilot, etc."
+                                    )
+                                    canvas_model = gr.Dropdown(
+                                        label="Model",
+                                        choices=get_installed_models(),
+                                        value=get_installed_models()[0] if get_installed_models() else None
+                                    )
+                                    canvas_temperature = gr.Slider(
+                                        label="Temperature",
+                                        minimum=0.0,
+                                        maximum=1.0,
+                                        value=0.3,
+                                        step=0.1
+                                    )
+                            
+                            download_grade_btn = gr.Button("📥 Download & Grade All Submissions", variant="primary", size="lg")
+                            download_result = gr.Markdown("")
+                        
+                        # Section B: Grade Review & Management
+                        gr.Markdown("---")
+                        gr.Markdown("### 📋 Grading Sessions")
+                        
+                        refresh_sessions_btn = gr.Button("🔄 Refresh Sessions", size="sm")
+                        sessions_table = gr.HTML(label="Grading Sessions")
+                        
+                        gr.Markdown("---")
+                        gr.Markdown("### ✏️ Grade Review & Editor")
+                        
+                        with gr.Row():
+                            canvas_session_id = gr.Number(
+                                label="Session ID",
+                                value=0,
+                                precision=0
+                            )
+                            load_session_btn = gr.Button("📂 Load Session", variant="primary")
+                        
+                        canvas_session_info = gr.Markdown("Enter a session ID and click Load Session")
+                        
+                        with gr.Row():
+                            canvas_filter = gr.Dropdown(
+                                label="Filter",
+                                choices=["All", "Needs Review", "Ready to Upload"],
+                                value="All"
+                            )
+                            accept_all_btn = gr.Button("✅ Accept All Parsed Grades", variant="secondary")
+                        
+                        grades_table = gr.HTML(label="Grades")
+                        
+                        gr.Markdown("#### Edit Individual Grade")
+                        with gr.Row():
+                            edit_grade_id = gr.Number(
+                                label="Grade ID",
+                                value=0,
+                                precision=0
+                            )
+                            load_grade_btn = gr.Button("📝 Load Grade", size="sm")
+                        
+                        with gr.Row():
+                            with gr.Column(scale=2):
+                                edit_student_name = gr.Textbox(label="Student", interactive=False)
+                                edit_parsed_grade = gr.Textbox(label="Parsed Grade (from LLM)", interactive=False)
+                                edit_manual_grade = gr.Textbox(label="Final Grade (editable)", placeholder="Edit grade here")
+                                edit_comments = gr.Textbox(
+                                    label="Comments (editable)",
+                                    placeholder="Edit comments here...",
+                                    lines=5
+                                )
+                                edit_mark_reviewed = gr.Checkbox(label="Mark as Reviewed", value=False)
+                                save_grade_btn = gr.Button("💾 Save Grade", variant="primary")
+                                save_result = gr.Markdown("")
+                            
+                            with gr.Column(scale=1):
+                                gr.Markdown("**Raw LLM JSON Output**")
+                                edit_raw_json = gr.Textbox(
+                                    label="Raw JSON",
+                                    lines=20,
+                                    max_lines=20,
+                                    interactive=False,
+                                    show_copy_button=True
+                                )
+                        
+                        gr.Markdown("---")
+                        gr.Markdown("### 📤 Upload to Canvas")
+                        
+                        with gr.Row():
+                            upload_all_btn = gr.Button("🚀 Upload All Reviewed Grades", variant="primary", size="lg")
+                            upload_single_grade_id = gr.Number(label="Or Upload Single Grade ID", value=0, precision=0)
+                            upload_single_btn = gr.Button("Upload Single", size="sm")
+                        
+                        upload_result = gr.Markdown("")
+                        
+                        # Section C: Spreadsheet View (Bulk Edit)
+                        gr.Markdown("---")
+                        with gr.Accordion("📊 Spreadsheet View (Bulk Edit)", open=False):
+                            gr.Markdown("""
+                            **Quick bulk editing for multiple grades at once**
+                            
+                            1. Enter session ID and click "Load Spreadsheet"
+                            2. Edit Final Grade and Comments columns directly in the table
+                            3. Click "Save All Changes" to update all modified grades
+                            
+                            **Columns**: Student Name, Parsed Grade (reference), Final Grade (editable), Comments (editable), 
+                            Submission Text (preview), Detailed Feedback, Raw LLM JSON, Needs Review
+                            """)
+                            
+                            with gr.Row():
+                                spreadsheet_session_id = gr.Number(
+                                    label="Session ID",
+                                    value=0,
+                                    precision=0
+                                )
+                                load_spreadsheet_btn = gr.Button("📊 Load Spreadsheet", variant="primary")
+                            
+                            spreadsheet_info = gr.Markdown("Enter a session ID to load grades spreadsheet")
+                            
+                            grades_dataframe = gr.Dataframe(
+                                headers=[
+                                    "ID", "Student", "Parsed Grade", "Final Grade", "Comments",
+                                    "Submission (preview)", "Detailed Feedback", "Raw JSON (preview)", "Needs Review"
+                                ],
+                                label="Grades Spreadsheet",
+                                interactive=True,
+                                wrap=True,
+                                col_count=(9, "fixed")
+                            )
+                            
+                            with gr.Row():
+                                mark_all_reviewed_checkbox = gr.Checkbox(
+                                    label="Mark All as Reviewed",
+                                    value=False
+                                )
+                                save_bulk_btn = gr.Button("💾 Save All Changes", variant="primary", size="lg")
+                                export_csv_btn = gr.Button("📥 Export Full CSV", size="sm")
+                            
+                            bulk_save_result = gr.Markdown("")
+                            csv_download = gr.File(label="Download CSV", visible=False)
         
         # SPLIT VIEW LAYOUT - Input on Left, Output on Right
         with gr.Row(visible=False) as split_layout_row:
@@ -1178,6 +1379,113 @@ def build_interface():
         ).then(
             fn=format_feedback_table,
             outputs=[feedback_table]
+        ).then(
+            fn=canvas_handlers.load_stored_credentials,
+            outputs=[canvas_url_input, canvas_token_input, canvas_status, canvas_instructor_name]
+        ).then(
+            fn=canvas_handlers.load_grading_sessions,
+            outputs=[sessions_table]
+        )
+        
+        # Canvas event handlers
+        connect_canvas_btn.click(
+            fn=canvas_handlers.connect_to_canvas,
+            inputs=[canvas_url_input, canvas_token_input],
+            outputs=[canvas_status, canvas_course_dropdown, canvas_instructor_name]
+        )
+        
+        canvas_course_dropdown.change(
+            fn=canvas_handlers.load_assignments_for_course,
+            inputs=[canvas_course_dropdown],
+            outputs=[canvas_assignment_dropdown, canvas_assignment_details]
+        )
+        
+        canvas_assignment_dropdown.change(
+            fn=canvas_handlers.show_assignment_details,
+            inputs=[canvas_course_dropdown, canvas_assignment_dropdown],
+            outputs=[canvas_assignment_details]
+        )
+        
+        download_grade_btn.click(
+            fn=canvas_handlers.download_and_grade_submissions,
+            inputs=[
+                canvas_course_dropdown,
+                canvas_assignment_dropdown,
+                canvas_instructions,
+                canvas_criteria,
+                canvas_output_format,
+                canvas_max_score,
+                canvas_ai_keywords,
+                canvas_model,
+                canvas_temperature
+            ],
+            outputs=[download_result, sessions_table]
+        )
+        
+        refresh_sessions_btn.click(
+            fn=canvas_handlers.load_grading_sessions,
+            outputs=[sessions_table]
+        )
+        
+        load_session_btn.click(
+            fn=canvas_handlers.load_session_for_review,
+            inputs=[canvas_session_id],
+            outputs=[canvas_session_info, grades_table, canvas_filter]
+        )
+        
+        canvas_filter.change(
+            fn=canvas_handlers.load_grades_table,
+            inputs=[canvas_session_id, canvas_filter],
+            outputs=[grades_table]
+        )
+        
+        load_grade_btn.click(
+            fn=canvas_handlers.get_grade_details,
+            inputs=[canvas_session_id, edit_grade_id],
+            outputs=[edit_student_name, edit_parsed_grade, edit_manual_grade, edit_comments, edit_raw_json, edit_mark_reviewed]
+        )
+        
+        save_grade_btn.click(
+            fn=canvas_handlers.update_grade,
+            inputs=[canvas_session_id, edit_grade_id, edit_manual_grade, edit_comments, edit_mark_reviewed],
+            outputs=[save_result, grades_table]
+        )
+        
+        accept_all_btn.click(
+            fn=canvas_handlers.accept_all_parsed_grades,
+            inputs=[canvas_session_id],
+            outputs=[save_result, grades_table]
+        )
+        
+        upload_all_btn.click(
+            fn=canvas_handlers.upload_all_grades,
+            inputs=[canvas_session_id],
+            outputs=[upload_result]
+        )
+        
+        upload_single_btn.click(
+            fn=canvas_handlers.upload_single_grade,
+            inputs=[canvas_session_id, upload_single_grade_id],
+            outputs=[upload_result]
+        )
+        
+        # Spreadsheet view event handlers
+        load_spreadsheet_btn.click(
+            fn=canvas_handlers.load_grades_spreadsheet,
+            inputs=[spreadsheet_session_id],
+            outputs=[grades_dataframe, spreadsheet_info]
+        )
+        
+        save_bulk_btn.click(
+            fn=canvas_handlers.save_bulk_grades,
+            inputs=[spreadsheet_session_id, grades_dataframe, mark_all_reviewed_checkbox],
+            outputs=[bulk_save_result]
+        )
+        
+        export_csv_btn.click(
+            fn=canvas_handlers.export_grades_csv,
+            inputs=[spreadsheet_session_id],
+            outputs=[csv_download, bulk_save_result]
         )
     
     return app
